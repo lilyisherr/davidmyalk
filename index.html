@@ -11,136 +11,438 @@
     <style>
         :root {
             --primary: #FF0000;
+            --navy: #0A1128;
+            --navy-light: #16213E;
             --font-display: 'Anton', sans-serif;
             --font-body: 'Oswald', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
-            background-color: #000;
+            background-color: var(--navy);
             color: #fff;
             font-family: var(--font-body);
             margin: 0;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
-        h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.05em; }
-        .glitch-text { position: relative; }
+        h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.05em; line-height: 0.9; }
+
+        /* Glitch Effect */
+        .glitch-text { position: relative; display: inline-block; }
         .glitch-text::before, .glitch-text::after {
             content: attr(data-text);
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--navy); 
         }
         .glitch-text::before {
-            left: 2px; text-shadow: -1px 0 #ff0000;
+            left: 2px; text-shadow: -2px 0 #ff0000;
             clip: rect(44px, 450px, 56px, 0);
             animation: glitch-anim 5s infinite linear alternate-reverse;
         }
-        @keyframes glitch-anim {
-            0% { clip: rect(42px, 9999px, 44px, 0); }
-            100% { clip: rect(4px, 9999px, 91px, 0); }
+        .glitch-text::after {
+            left: -2px; text-shadow: -2px 0 #00f0ff;
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim2 5s infinite linear alternate-reverse;
         }
-        .clip-slant { clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
-        .nav-link { font-family: var(--font-display); transition: color 0.3s; }
+        @keyframes glitch-anim {
+            0% { clip: rect(31px, 9999px, 94px, 0); } 20% { clip: rect(62px, 9999px, 42px, 0); }
+            40% { clip: rect(10px, 9999px, 85px, 0); } 60% { clip: rect(2px, 9999px, 23px, 0); }
+            80% { clip: rect(74px, 9999px, 12px, 0); } 100% { clip: rect(56px, 9999px, 34px, 0); }
+        }
+        @keyframes glitch-anim2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); } 20% { clip: rect(12px, 9999px, 54px, 0); }
+            40% { clip: rect(79px, 9999px, 85px, 0); } 60% { clip: rect(25px, 9999px, 5px, 0); }
+            80% { clip: rect(67px, 9999px, 61px, 0); } 100% { clip: rect(14px, 9999px, 79px, 0); }
+        }
+        .clip-slant { clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+        .nav-link { font-family: var(--font-display); transition: all 0.3s; position: relative; }
+        .nav-link::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: var(--primary); transition: width 0.3s; }
+        .nav-link:hover::after { width: 100%; }
         .nav-link:hover { color: var(--primary); }
-        .product-card { transition: transform 0.3s; }
-        .product-card:hover { transform: translateY(-5px); }
-        html { scroll-behavior: smooth; }
+
+        .product-card { transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); }
+        .product-card:hover { transform: translateY(-8px); }
+        .product-card img { transition: transform 0.8s cubic-bezier(0.165, 0.84, 0.44, 1); }
+        .product-card:hover img { transform: scale(1.1); filter: grayscale(0); }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 18vw !important; }
+            .section-padding { padding-top: 8rem; padding-bottom: 8rem; }
+        }
+
+        /* Gritty Overlay */
+        .gritty-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("https://www.transparenttextures.com/patterns/stardust.png");
+            opacity: 0.1; pointer-events: none; z-index: 9999;
+        }
+
+        /* Border Glow */
+        .glow-border { box-shadow: 0 0 15px rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .text-outline { -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3); color: transparent; }
+
+        /* Marquee Effect */
+        .marquee { overflow: hidden; white-space: nowrap; background: #FF0000; color: white; padding: 10px 0; font-family: var(--font-display); text-transform: uppercase; font-size: 1.5rem; letter-spacing: 0.2em; }
+        .marquee-content { display: inline-block; animation: marquee 20s linear infinite; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* Hero Text Animation */
+        .reveal-text { animation: reveal 1s cubic-bezier(0.77, 0, 0.175, 1) forwards; clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); }
+        @keyframes reveal {
+            0% { clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); transform: translateY(20px); }
+            100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); transform: translateY(0); }
+        }
+
+        /* Better scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff0000; }
+
+        /* Mobile Menu */
+        #mobile-menu { transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); }
+        #mobile-menu.hidden-menu { transform: translateX(100%); }
+
+        /* Live Badge Pulse Animation */
+        .live-dot {
+            width: 10px; height: 10px; background-color: #FF0000; border-radius: 50%;
+            display: inline-block; margin-right: 8px;
+            box-shadow: 0 0 0 rgba(255, 0, 0, 0.4);
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
     </style>
 </head>
 <body>
-    <nav class="fixed top-0 w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10 px-6 py-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <a href="#" class="text-2xl font-display italic tracking-tighter">DAVID <span class="text-red-600">MYALIK</span></a>
-            <div class="hidden md:flex gap-8">
-                <a href="#home" class="nav-link uppercase tracking-widest">Home</a>
-                <a href="#shop" class="nav-link uppercase tracking-widest">Shop</a>
-                <a href="#about" class="nav-link uppercase tracking-widest">About</a>
-                <a href="#contact" class="nav-link uppercase tracking-widest">Contact</a>
-            </div>
+    <div class="gritty-overlay"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 bg-navy-light/80 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex justify-between items-center glow-border">
+        <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
             <div class="flex items-center gap-4">
-                <button class="relative hover:text-red-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                <!-- LIVE STATUS BADGE (Hidden by default, shown via JS) -->
+                <a href="https://www.youtube.com/@davidmyalik/live" target="_blank" id="live-badge" class="hidden flex items-center bg-red-600/20 border border-red-600 px-3 py-1 rounded-full cursor-pointer hover:bg-red-600 transition-colors group">
+                    <span class="live-dot"></span>
+                    <span class="font-mono text-xs font-bold text-red-500 group-hover:text-white tracking-widest uppercase">Live Now</span>
+                </a>
+
+                <a href="#" class="text-2xl md:text-3xl font-display italic tracking-tighter">DAVID <span class="text-red-600">MYALIK</span></a>
+            </div>
+
+            <div class="hidden md:flex gap-10">
+                <a href="#home" class="nav-link uppercase tracking-widest text-xs font-bold">Home</a>
+                <a href="#shop" class="nav-link uppercase tracking-widest text-xs font-bold">Shop</a>
+                <a href="#about" class="nav-link uppercase tracking-widest text-xs font-bold">About</a>
+                <a href="#contact" class="nav-link uppercase tracking-widest text-xs font-bold">Contact</a>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <button class="relative hover:text-red-600 transition-colors group" aria-label="View Cart" id="cart-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:scale-110 transition-transform"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                    <span class="absolute -top-2 -right-2 bg-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full ring-2 ring-[#0A1128]" id="cart-count">0</span>
+                </button>
+                <button class="md:hidden text-white" id="menu-toggle" aria-label="Open Menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
             </div>
         </div>
     </nav>
 
-    <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-        <img src="https://images.unsplash.com/photo-1621213327685-6d09e99c1040?q=80&w=2070&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover grayscale opacity-60">
-        <div class="relative z-20 text-center px-6">
-            <h1 class="text-[15vw] leading-none font-black glitch-text" data-text="MYALIK">MYALIK</h1>
-            <p class="mt-4 text-xl md:text-2xl font-mono text-red-600 uppercase tracking-[0.5em]">Sideways Always • Est. 2026</p>
-            <a href="#shop" class="inline-block mt-12 px-12 py-4 bg-red-600 text-white font-display text-xl uppercase tracking-widest hover:bg-white hover:text-black transition-all">Shop Drop</a>
-        </div>
-    </section>
+    <!-- Mobile Navigation Overlay -->
+    <div id="mobile-menu" class="fixed inset-0 z-[60] bg-black hidden-menu md:hidden flex flex-col items-center justify-center gap-8">
+        <button class="absolute top-6 right-6 text-white" id="menu-close" aria-label="Close Menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <a href="#home" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Home</a>
+        <a href="#shop" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Shop</a>
+        <a href="#about" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">About</a>
+        <a href="#contact" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Contact</a>
+    </div>
 
-    <section id="shop" class="py-24 px-6 bg-black border-t border-white/10">
-        <div class="max-w-7xl mx-auto">
-            <h2 class="text-6xl mb-12">Latest Drops</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12" id="product-grid">
-                <!-- Products will be injected here -->
+    <!-- Hero Section -->
+    <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-t from-[#0A1128] via-[#0A1128]/40 to-transparent z-10"></div>
+        <!-- Background Image -->
+        <img src="https://images.unsplash.com/photo-1621213327685-6d09e99c1040?q=80&w=2070&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover grayscale opacity-40 scale-10" alt="Background">
+        
+        <div class="relative z-20 text-center px-4 max-w-5xl">
+            <h1 class="text-[18vw] md:text-[14vw] leading-none font-black glitch-text tracking-tighter reveal-text" data-text="MYALIK">MYALIK</h1>
+            <p class="mt-6 text-base md:text-xl font-mono text-red-600 uppercase tracking-[0.4em] md:tracking-[0.8em] animate-pulse reveal-text" style="animation-delay: 0.2s">Sideways Always • Est. 2026</p>
+            
+            <div class="mt-16 flex flex-col md:flex-row items-center justify-center gap-8 reveal-text" style="animation-delay: 0.4s">
+                <a href="#shop" class="group relative w-full md:w-auto px-16 py-6 bg-red-600 text-white font-display text-2xl uppercase tracking-widest transition-all clip-slant hover:bg-white hover:text-black shadow-[0_0_40px_rgba(255,0,0,0.4)]">
+                    <span class="relative z-10">Shop Drop</span>
+                    <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                </a>
+
+                <!-- Dynamic Latest Video Button -->
+                <a href="https://www.youtube.com/@davidmyalik" target="_blank" id="latest-video-btn" class="group w-full md:w-auto px-16 py-6 border-2 border-white/40 text-white font-display text-2xl uppercase tracking-widest hover:bg-white hover:text-black transition-all clip-slant flex items-center justify-center gap-4">
+                    <span id="latest-video-text">Latest Video</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="opacity-70"><path d="M8 5v14l11-7z"/></svg>
+                </a>
             </div>
         </div>
     </section>
 
-    <section id="about" class="py-24 px-6 bg-[#0a0a0a]">
-        <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-            <div>
-                <h2 class="text-6xl mb-6">The Driver</h2>
-                <p class="text-xl text-white/70 mb-8 font-light leading-relaxed">Living my dream life, building cool cars one project at a time. From the S13 to the track, we push the limits of what's possible sideways.</p>
-                <div class="flex gap-6">
-                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="text-red-600 hover:text-white transition-colors uppercase font-display tracking-widest text-lg">YouTube</a>
-                    <a href="#" class="text-red-600 hover:text-white transition-colors uppercase font-display tracking-widest text-lg">Instagram</a>
+    <!-- Shop Section -->
+    <section id="shop" class="py-24 md:py-32 px-4 md:px-8 bg-[#0A1128] border-t border-white/10">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+                <div>
+                    <h2 class="text-6xl md:text-8xl mb-4">Latest <span class="text-red-600">Drops</span></h2>
+                    <p class="text-white/40 font-mono uppercase tracking-widest text-sm">Limited production • High performance gear</p>
+                </div>
+                <div class="flex gap-4">
+                    <button class="px-6 py-2 border border-white/10 text-xs font-mono uppercase hover:border-red-600 transition-colors">Apparel</button>
+                    <button class="px-6 py-2 border border-white/10 text-xs font-mono uppercase hover:border-red-600 transition-colors">Accessories</button>
                 </div>
             </div>
-            <div class="relative">
-                <div class="absolute -inset-4 border border-red-600/30"></div>
-                <img src="https://images.unsplash.com/photo-1541443131876-44b03de101c5?q=80&w=2070&auto=format&fit=crop" class="relative z-10 w-full grayscale contrast-125">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12" id="product-grid">
+                <!-- Products injected via JS -->
             </div>
         </div>
     </section>
 
-    <section id="contact" class="py-24 px-6 bg-black">
-        <div class="max-w-3xl mx-auto text-center">
-            <h2 class="text-6xl mb-6">Get in Touch</h2>
-            <p class="text-white/60 font-mono mb-12">Business inquiries & Collabs</p>
-            <form class="space-y-6" onsubmit="event.preventDefault(); alert('Message sent transmission! (Demo)');">
-                <input type="text" placeholder="NAME" class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono focus:outline-none focus:border-red-600 transition-colors">
-                <input type="email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono focus:outline-none focus:border-red-600 transition-colors">
-                <textarea placeholder="MESSAGE" rows="5" class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono focus:outline-none focus:border-red-600 transition-colors"></textarea>
-                <button type="submit" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-colors">Send Transmission</button>
-            </form>
+    <!-- About Section -->
+    <section id="about" class="py-24 md:py-32 px-4 md:px-8 bg-[#0D1630]">
+        <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 md:gap-24 items-center">
+            <div class="order-2 lg:order-1">
+                <div class="relative group">
+                    <div class="absolute -inset-4 md:-inset-8 border-2 border-red-600/30 group-hover:border-red-600 transition-colors duration-500"></div>
+                    <img src="https://images.unsplash.com/photo-1544433100-3f0449492f25?q=80&w=2070&auto=format&fit=crop" alt="Nissan S13 Drift Car" class="relative z-10 w-full grayscale contrast-125 group-hover:grayscale-0 group-hover:scale-[1.02] transition-all duration-700 glow-border">
+                    <div class="absolute -bottom-6 -right-6 md:-bottom-10 md:-right-10 bg-red-600 px-6 md:px-10 py-4 md:py-6 z-20 hidden md:block clip-slant shadow-2xl">
+                        <span class="font-display text-4xl md:text-6xl text-white italic">S13 SILVIA</span>
+                    </div>
+                </div>
+            </div>
+            <div class="order-1 lg:order-2">
+                <h2 class="text-6xl md:text-8xl mb-8">The <span class="text-red-600">Vision</span></h2>
+                <div class="space-y-6">
+                    <p class="text-xl md:text-2xl text-white/80 font-light leading-relaxed">Living my dream life, building cool cars one project at a time. This isn't just about drifting; it's about the culture, the community, and the constant pursuit of perfection sideways.</p>
+                    <p class="text-lg text-white/50 font-light leading-relaxed">Every piece of gear is designed with the same intensity we bring to the track. Built to last, styled for the street.</p>
+                </div>
+                <div class="flex flex-wrap gap-8 mt-12">
+                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="group flex items-center gap-4">
+                        <div class="w-12 h-12 flex items-center justify-center bg-white/5 group-hover:bg-red-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        </div>
+                        <span class="font-display text-xl uppercase tracking-widest">YouTube</span>
+                    </a>
+                    <a href="#" class="group flex items-center gap-4">
+                        <div class="w-12 h-12 flex items-center justify-center bg-white/5 group-hover:bg-red-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        </div>
+                        <span class="font-display text-xl uppercase tracking-widest">Instagram</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </section>
 
-    <footer class="py-12 px-6 border-t border-white/10 text-center">
-        <p class="font-mono text-white/40 tracking-widest uppercase">© Copyright 2026 DAVID MYALIK. All Rights Reserved.</p>
+    <!-- Contact Section -->
+    <section id="contact" class="py-24 md:py-32 px-4 md:px-8 bg-[#0A1128]">
+        <div class="max-w-4xl mx-auto">
+            <div class="grid lg:grid-cols-2 gap-16 md:gap-24">
+                <div>
+                    <h2 class="text-6xl md:text-8xl mb-8">Contact <span class="text-red-600">Base</span></h2>
+                    <p class="text-xl text-white/50 mb-12 font-light">Collaborations, sponsorships, or order inquiries. Our team is ready.</p>
+                    <div class="space-y-4 font-mono text-sm uppercase tracking-[0.2em]">
+                        <p class="text-red-600">Email: <span class="text-white hover:text-red-600 transition-colors cursor-pointer">contact@davidmyalik.com</span></p>
+                        <p class="text-red-600">Status: <span class="text-white">Active Pursuit</span></p>
+                    </div>
+                </div>
+                <form class="space-y-6" onsubmit="event.preventDefault(); alert('Transmission received. We will respond shortly.');">
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <input type="text" placeholder="NAME" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20">
+                        <input type="email" placeholder="EMAIL" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20">
+                    </div>
+                    <select class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors text-white/20">
+                        <option value="">REASON FOR TRANSMISSION</option>
+                        <option value="order">ORDER INQUIRY</option>
+                        <option value="collab">COLLABORATION</option>
+                        <option value="business">BUSINESS</option>
+                    </select>
+                    <textarea placeholder="MESSAGE" rows="5" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20"></textarea>
+                    <button type="submit" class="w-full bg-red-600 text-white font-display text-2xl uppercase tracking-widest py-6 hover:bg-white hover:text-black transition-all clip-slant group">
+                        Send Transmission <span class="inline-block transition-transform group-hover:translate-x-2 ml-4">→</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-16 px-4 md:px-8 border-t border-white/10 bg-[#0A1128]">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="text-center md:text-left">
+                <a href="#" class="text-3xl font-display italic tracking-tighter mb-4 block">DAVID <span class="text-red-600">MYALIK</span></a>
+                <p class="font-mono text-white/20 text-xs tracking-[0.2em] uppercase">Built for high performance</p>
+            </div>
+            <div class="flex gap-12 font-display text-sm tracking-widest uppercase text-white/40">
+                <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                <a href="#" class="hover:text-white transition-colors">Shipping</a>
+                <a href="#" class="hover:text-white transition-colors">Terms</a>
+            </div>
+            <p class="font-mono text-white/20 text-[10px] tracking-widest uppercase">© Copyright 2026 DAVID MYALIK. All Rights Reserved.</p>
+        </div>
     </footer>
 
+    <!-- Scripts -->
     <script>
-        const products = [
-            { id: 1, name: "Signature S13 Hoodie", price: 55, img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800" },
-            { id: 2, name: "Tire Slayer Tee", price: 30, img: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800" },
-            { id: 3, name: "Drift Team Sticker Pack", price: 12, img: "https://images.unsplash.com/photo-1572375992501-4f0f235addaa?w=800" }
-        ];
+        // =========================================================================
+        // CONFIGURATION: ADD YOUR API DETAILS HERE
+        // =========================================================================
+        const CONFIG = {
+            // Get your key here: https://console.cloud.google.com/apis/credentials
+            // 1. Create Project -> 2. Enable YouTube Data API v3 -> 3. Create API Key
+            apiKey: 'YOUR_GOOGLE_API_KEY_HERE', 
+            
+            // Channel ID has been updated for David Myalik
+            channelId: 'UCsQ5aY2YA7GEQarVbr21qcw' 
+        };
 
+        // =========================================================================
+        // SHOPPING CART & UI LOGIC
+        // =========================================================================
+        let cart = [];
+        const cartCount = document.getElementById('cart-count');
+        function updateCart() {
+            cartCount.innerText = cart.length;
+            cartCount.classList.add('animate-bounce');
+            setTimeout(() => cartCount.classList.remove('animate-bounce'), 500);
+        }
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (product) {
+                cart.push(product);
+                updateCart();
+                // alert(`${product.name} added to cart!`); 
+            }
+        }
+        function checkout() {
+            if (cart.length === 0) {
+                alert('Your cart is empty!');
+                return;
+            }
+            alert('Redirecting to secure checkout...');
+        }
+        document.getElementById('cart-button').addEventListener('click', checkout);
+
+        // Menu Logic
+        const menuToggle = document.getElementById('menu-toggle');
+        const menuClose = document.getElementById('menu-close');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const mobileLinks = document.querySelectorAll('.mobile-link');
+        menuToggle.addEventListener('click', () => {
+            mobileMenu.classList.remove('hidden-menu');
+            document.body.style.overflow = 'hidden';
+        });
+        const closeMenu = () => {
+            mobileMenu.classList.add('hidden-menu');
+            document.body.style.overflow = 'auto';
+        };
+        menuClose.addEventListener('click', closeMenu);
+        mobileLinks.forEach(link => link.addEventListener('click', closeMenu));
+
+        // Product Data
+        const products = [
+            { id: 1, name: "Signature S13 Hoodie", price: 55, img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800", cat: "APPAREL" },
+            { id: 2, name: "Tire Slayer Tee", price: 30, img: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800", cat: "APPAREL" },
+            { id: 3, name: "Drift Team Sticker Pack", price: 12, img: "https://images.unsplash.com/photo-1572375992501-4f0f235addaa?w=800", cat: "ACCESSORIES" },
+            { id: 4, name: "Sideways Cap", price: 35, img: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800", cat: "ACCESSORIES" },
+            { id: 5, name: "Racing Socks", price: 18, img: "https://images.unsplash.com/photo-1582967702221-b1710fe04243?w=800", cat: "ACCESSORIES" },
+            { id: 6, name: "Turbo Keychain", price: 15, img: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800", cat: "ACCESSORIES" }
+        ];
         const grid = document.getElementById('product-grid');
         products.forEach(p => {
             grid.innerHTML += `
-                <div class="product-card group cursor-pointer">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-white/5 border border-white/10">
-                        <img src="${p.img}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0">
-                        <div class="absolute bottom-0 left-0 w-full p-6 translate-y-full group-hover:translate-y-0 transition-transform bg-red-600">
-                            <span class="font-display text-white uppercase tracking-widest text-lg">Add to Cart</span>
+                <div class="product-card group cursor-pointer" onclick="addToCart(${p.id})">
+                    <div class="relative aspect-[4/5] overflow-hidden bg-white/5 border border-white/10">
+                        <div class="absolute top-4 left-4 z-20 bg-black/80 px-3 py-1 border border-white/10">
+                            <span class="font-mono text-[10px] text-white tracking-widest uppercase">${p.cat}</span>
                         </div>
+                        <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover grayscale brightness-75 transition-all">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <button class="bg-red-600 text-white font-display uppercase tracking-widest px-8 py-3 clip-slant">Quick Add</button>
+                        </div>
+                        <div class="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                     </div>
-                    <div class="mt-6 flex justify-between items-start">
-                        <h3 class="text-2xl">${p.name}</h3>
-                        <span class="font-mono text-red-600 text-xl">$${p.price}</span>
+                    <div class="mt-8 flex justify-between items-start">
+                        <div>
+                            <h3 class="text-2xl md:text-3xl tracking-tight">${p.name}</h3>
+                            <p class="font-mono text-[10px] text-white/30 uppercase mt-1 tracking-widest">In Stock • Limited Release</p>
+                        </div>
+                        <span class="font-display text-2xl md:text-3xl text-red-600 tracking-tighter">$${p.price}</span>
                     </div>
                 </div>
             `;
         });
+
+        // =========================================================================
+        // YOUTUBE API LOGIC
+        // =========================================================================
+        
+        async function initYouTubeData() {
+            if (CONFIG.apiKey === 'YOUR_GOOGLE_API_KEY_HERE') {
+                console.warn('YouTube API Key missing. Please edit the CONFIG object in the HTML file.');
+                return;
+            }
+
+            try {
+                let channelId = CONFIG.channelId;
+
+                // 1. Check Live Status
+                // We search for 'live' events.
+                const liveUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet,id&channelId=${channelId}&eventType=live&type=video&key=${CONFIG.apiKey}`;
+                const liveRes = await fetch(liveUrl);
+                const liveData = await liveRes.json();
+
+                const liveBadge = document.getElementById('live-badge');
+                if (liveData.pageInfo.totalResults > 0) {
+                    // User is live
+                    liveBadge.classList.remove('hidden');
+                    liveBadge.classList.add('flex');
+                    // Update live link
+                    liveBadge.href = `https://www.youtube.com/watch?v=${liveData.items[0].id.videoId}`;
+                }
+
+                // 2. Get Latest Video
+                // Order by date to get the most recent upload
+                const videoUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&type=video&maxResults=1&key=${CONFIG.apiKey}`;
+                const videoRes = await fetch(videoUrl);
+                const videoData = await videoRes.json();
+
+                if (videoData.items && videoData.items.length > 0) {
+                    const latestVideo = videoData.items[0];
+                    const videoId = latestVideo.id.videoId;
+                    const title = latestVideo.snippet.title;
+                    
+                    // Update UI
+                    const btn = document.getElementById('latest-video-btn');
+                    const btnText = document.getElementById('latest-video-text');
+                    
+                    btn.href = `https://www.youtube.com/watch?v=${videoId}`;
+                    // Truncate title if too long
+                    btnText.innerText = title.length > 20 ? title.substring(0, 20) + '...' : title;
+                    btnText.classList.add('text-red-500'); // Make text pop
+                }
+
+            } catch (error) {
+                console.error('Error fetching YouTube data:', error);
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initYouTubeData);
+
     </script>
 </body>
 </html>
