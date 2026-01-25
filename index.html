@@ -11,14 +11,16 @@
     <style>
         :root {
             --primary: #FF0000;
-            --navy: #0A1128;
-            --navy-light: #16213E;
+            --primary-dark: #cc0000;
+            --navy: #050810;
+            --navy-light: #0f1623;
             --font-display: 'Anton', sans-serif;
             --font-body: 'Oswald', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; cursor: none; /* Hide default cursor */ }
         html { scroll-behavior: smooth; }
+        
         body {
             background-color: var(--navy);
             color: #fff;
@@ -27,15 +29,37 @@
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
-        h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.05em; line-height: 0.9; }
+
+        /* Typography */
+        h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; line-height: 0.9; }
+        
+        /* Custom Cursor */
+        #cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 20px; height: 20px;
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+            mix-blend-mode: difference;
+        }
+        #cursor.hovered {
+            width: 50px; height: 50px;
+            background-color: rgba(255, 0, 0, 0.2);
+            border-color: transparent;
+        }
 
         /* Glitch Effect */
+        .glitch-wrapper { position: relative; display: inline-block; }
         .glitch-text { position: relative; display: inline-block; }
         .glitch-text::before, .glitch-text::after {
             content: attr(data-text);
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--navy); 
+            background: var(--navy);
         }
         .glitch-text::before {
             left: 2px; text-shadow: -2px 0 #ff0000;
@@ -57,391 +81,598 @@
             40% { clip: rect(79px, 9999px, 85px, 0); } 60% { clip: rect(25px, 9999px, 5px, 0); }
             80% { clip: rect(67px, 9999px, 61px, 0); } 100% { clip: rect(14px, 9999px, 79px, 0); }
         }
+
         .clip-slant { clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
-        .nav-link { font-family: var(--font-display); transition: all 0.3s; position: relative; }
-        .nav-link::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: var(--primary); transition: width 0.3s; }
+        
+        /* Nav Links */
+        .nav-link { font-family: var(--font-display); transition: color 0.3s; position: relative; }
+        .nav-link::after {
+            content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px;
+            background: var(--primary); transition: width 0.3s;
+        }
         .nav-link:hover::after { width: 100%; }
         .nav-link:hover { color: var(--primary); }
-
-        .product-card { transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); }
-        .product-card:hover { transform: translateY(-8px); }
-        .product-card img { transition: transform 0.8s cubic-bezier(0.165, 0.84, 0.44, 1); }
-        .product-card:hover img { transform: scale(1.1); filter: grayscale(0); }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            h1 { font-size: 18vw !important; }
-            .section-padding { padding-top: 8rem; padding-bottom: 8rem; }
-        }
+        
+        /* Product Card */
+        .product-card { transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); }
+        .product-card:hover { transform: translateY(-10px); }
+        .product-card img { transition: transform 0.7s cubic-bezier(0.165, 0.84, 0.44, 1); }
+        .product-card:hover img { transform: scale(1.05); filter: grayscale(0%); }
 
         /* Gritty Overlay */
         .gritty-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-image: url("https://www.transparenttextures.com/patterns/stardust.png");
-            opacity: 0.1; pointer-events: none; z-index: 9999;
+            opacity: 0.03; pointer-events: none; z-index: 9998;
         }
 
-        /* Border Glow */
-        .glow-border { box-shadow: 0 0 15px rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .text-outline { -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3); color: transparent; }
-
-        /* Marquee Effect */
-        .marquee { overflow: hidden; white-space: nowrap; background: #FF0000; color: white; padding: 10px 0; font-family: var(--font-display); text-transform: uppercase; font-size: 1.5rem; letter-spacing: 0.2em; }
-        .marquee-content { display: inline-block; animation: marquee 20s linear infinite; }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-
-        /* Hero Text Animation */
-        .reveal-text { animation: reveal 1s cubic-bezier(0.77, 0, 0.175, 1) forwards; clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); }
-        @keyframes reveal {
-            0% { clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); transform: translateY(20px); }
-            100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); transform: translateY(0); }
-        }
-
-        /* Better scrollbar */
+        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #ff0000; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
-        /* Mobile Menu */
-        #mobile-menu { transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); }
-        #mobile-menu.hidden-menu { transform: translateX(100%); }
+        /* Scroll Animations */
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.5, 0, 0, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
 
-        /* Live Badge Pulse Animation */
-        .live-dot {
-            width: 10px; height: 10px; background-color: #FF0000; border-radius: 50%;
-            display: inline-block; margin-right: 8px;
-            box-shadow: 0 0 0 rgba(255, 0, 0, 0.4);
-            animation: pulse-red 2s infinite;
+        /* Checkout Steps */
+        .step-indicator { transition: all 0.3s; }
+        .step-indicator.active { background-color: var(--primary); color: white; border-color: var(--primary); }
+        .step-indicator.completed { background-color: white; color: black; border-color: white; }
+        
+        .checkout-section { display: none; animation: fadeIn 0.4s ease; }
+        .checkout-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Input Styling */
+        .input-group input, .input-group select {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            width: 100%;
+            padding: 12px 16px;
+            font-family: var(--font-mono);
+            transition: 0.3s;
+            outline: none;
         }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        .input-group input:focus, .input-group select:focus {
+            border-color: var(--primary);
+            background: rgba(255,255,255,0.05);
+        }
+        .input-group label {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        /* Cart Sidebar */
+        .cart-sidebar {
+            transform: translateX(100%);
+            transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+        .cart-sidebar.open { transform: translateX(0); }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 18vw !important; }
+            #cursor { display: none; } /* Disable custom cursor on touch */
+            * { cursor: auto; }
         }
     </style>
 </head>
 <body>
+    
+    <!-- Custom Cursor -->
+    <div id="cursor"></div>
     <div class="gritty-overlay"></div>
 
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 bg-navy-light/80 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex justify-between items-center glow-border">
+    <nav class="fixed top-0 w-full z-50 bg-navy/80 backdrop-blur-md border-b border-white/5 px-6 py-4">
         <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <!-- LIVE STATUS BADGE (Hidden by default, shown via JS) -->
-                <a href="https://www.youtube.com/@davidmyalik/live" target="_blank" id="live-badge" class="hidden flex items-center bg-red-600/20 border border-red-600 px-3 py-1 rounded-full cursor-pointer hover:bg-red-600 transition-colors group">
-                    <span class="live-dot"></span>
-                    <span class="font-mono text-xs font-bold text-red-500 group-hover:text-white tracking-widest uppercase">Live Now</span>
-                </a>
-
-                <a href="#" class="text-2xl md:text-3xl font-display italic tracking-tighter">DAVID <span class="text-red-600">MYALIK</span></a>
-            </div>
-
+            <a href="#home" class="text-2xl md:text-3xl font-display italic tracking-tighter hover-trigger">DAVID <span class="text-red-600">MYALIK</span></a>
+            
             <div class="hidden md:flex gap-10">
-                <a href="#home" class="nav-link uppercase tracking-widest text-xs font-bold">Home</a>
-                <a href="#shop" class="nav-link uppercase tracking-widest text-xs font-bold">Shop</a>
-                <a href="#about" class="nav-link uppercase tracking-widest text-xs font-bold">About</a>
-                <a href="#contact" class="nav-link uppercase tracking-widest text-xs font-bold">Contact</a>
+                <a href="#shop" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">Shop</a>
+                <a href="#about" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">About</a>
+                <a href="#contact" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">Contact</a>
             </div>
 
             <div class="flex items-center gap-6">
-                <button class="relative hover:text-red-600 transition-colors group" aria-label="View Cart" id="cart-button">
+                <button class="relative hover:text-red-600 transition-colors group hover-trigger" aria-label="View Cart" id="cart-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:scale-110 transition-transform"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                    <span class="absolute -top-2 -right-2 bg-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full ring-2 ring-[#0A1128]" id="cart-count">0</span>
+                    <span class="absolute -top-2 -right-2 bg-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full ring-2 ring-[#050810]" id="cart-count">0</span>
                 </button>
-                <button class="md:hidden text-white" id="menu-toggle" aria-label="Open Menu">
+                
+                <button class="md:hidden text-white" id="menu-btn" aria-label="Open Menu">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
             </div>
         </div>
     </nav>
 
-    <!-- Mobile Navigation Overlay -->
-    <div id="mobile-menu" class="fixed inset-0 z-[60] bg-black hidden-menu md:hidden flex flex-col items-center justify-center gap-8">
-        <button class="absolute top-6 right-6 text-white" id="menu-close" aria-label="Close Menu">
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-        <a href="#home" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Home</a>
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center gap-8" style="transform: translateY(-100%); transition: transform 0.4s ease;">
+        <button class="absolute top-6 right-6 text-white" id="close-menu-btn">✕</button>
         <a href="#shop" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Shop</a>
         <a href="#about" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">About</a>
         <a href="#contact" class="text-5xl font-display uppercase hover:text-red-600 transition-colors mobile-link">Contact</a>
     </div>
 
-    <!-- Hero Section -->
-    <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-t from-[#0A1128] via-[#0A1128]/40 to-transparent z-10"></div>
-        <!-- Background Image -->
-        <img src="https://images.unsplash.com/photo-1621213327685-6d09e99c1040?q=80&w=2070&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover grayscale opacity-40 scale-10" alt="Background">
+    <!-- Cart Sidebar -->
+    <div id="cart-overlay" class="fixed inset-0 bg-black/90 z-[70] hidden transition-opacity opacity-0" onclick="toggleCart()"></div>
+    <div id="cart-sidebar" class="fixed top-0 right-0 h-full w-full md:w-[450px] bg-[#050810] z-[80] cart-sidebar flex flex-col border-l border-white/10 shadow-2xl">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center">
+            <h2 class="text-2xl font-display tracking-widest">YOUR <span class="text-red-600">HAUL</span></h2>
+            <button onclick="toggleCart()" class="hover:text-red-600 transition-colors hover-trigger">✕</button>
+        </div>
         
-        <div class="relative z-20 text-center px-4 max-w-5xl">
-            <h1 class="text-[18vw] md:text-[14vw] leading-none font-black glitch-text tracking-tighter reveal-text" data-text="MYALIK">MYALIK</h1>
-            <p class="mt-6 text-base md:text-xl font-mono text-red-600 uppercase tracking-[0.4em] md:tracking-[0.8em] animate-pulse reveal-text" style="animation-delay: 0.2s">Sideways Always • Est. 2026</p>
+        <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div class="text-center text-white/20 font-mono mt-10">Cart is empty.</div>
+        </div>
+
+        <div class="p-6 border-t border-white/5 bg-black/20">
+            <div class="space-y-2 mb-6 font-mono text-sm">
+                <div class="flex justify-between text-white/60"><span>Subtotal</span><span id="cart-subtotal">$0.00</span></div>
+                <div class="flex justify-between text-white/60"><span>Shipping</span><span id="cart-shipping">$0.00</span></div>
+                <div class="flex justify-between text-white font-display text-xl tracking-wider pt-2 border-t border-white/10">
+                    <span>TOTAL</span>
+                    <span id="cart-total" class="text-red-600">$0.00</span>
+                </div>
+            </div>
+            <button onclick="startCheckout()" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden hover-trigger">
+                Checkout Now
+            </button>
+        </div>
+    </div>
+
+    <!-- CHECKOUT MODAL -->
+    <div id="checkout-modal" class="fixed inset-0 z-[100] bg-black/95 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0f1623] w-full max-w-2xl border border-white/10 relative shadow-2xl overflow-hidden">
+            <!-- Progress Bar -->
+            <div class="flex justify-between px-8 py-6 border-b border-white/5 bg-black/20">
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator active" id="step-1-indicator">1</div>
+                    <span class="text-[9px] mt-2 uppercase tracking-widest text-white/50">Shipping</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator" id="step-2-indicator">2</div>
+                    <span class="text-[9px] mt-2 uppercase tracking-widest text-white/50">Payment</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator" id="step-3-indicator">3</div>
+                    <span class="text-[9px] mt-2 uppercase tracking-widest text-white/50">Confirm</span>
+                </div>
+            </div>
+
+            <button onclick="closeCheckout()" class="absolute top-6 right-6 text-white/50 hover:text-white transition-colors hover-trigger">✕</button>
             
-            <div class="mt-16 flex flex-col md:flex-row items-center justify-center gap-8 reveal-text" style="animation-delay: 0.4s">
-                <a href="#shop" class="group relative w-full md:w-auto px-16 py-6 bg-red-600 text-white font-display text-2xl uppercase tracking-widest transition-all clip-slant hover:bg-white hover:text-black shadow-[0_0_40px_rgba(255,0,0,0.4)]">
-                    <span class="relative z-10">Shop Drop</span>
-                    <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                </a>
-
-                <!-- Dynamic Latest Video Button -->
-                <a href="https://www.youtube.com/@davidmyalik" target="_blank" id="latest-video-btn" class="group w-full md:w-auto px-16 py-6 border-2 border-white/40 text-white font-display text-2xl uppercase tracking-widest hover:bg-white hover:text-black transition-all clip-slant flex items-center justify-center gap-4">
-                    <span id="latest-video-text">Latest Video</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="opacity-70"><path d="M8 5v14l11-7z"/></svg>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Shop Section -->
-    <section id="shop" class="py-24 md:py-32 px-4 md:px-8 bg-[#0A1128] border-t border-white/10">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-                <div>
-                    <h2 class="text-6xl md:text-8xl mb-4">Latest <span class="text-red-600">Drops</span></h2>
-                    <p class="text-white/40 font-mono uppercase tracking-widest text-sm">Limited production • High performance gear</p>
-                </div>
-                <div class="flex gap-4">
-                    <button class="px-6 py-2 border border-white/10 text-xs font-mono uppercase hover:border-red-600 transition-colors">Apparel</button>
-                    <button class="px-6 py-2 border border-white/10 text-xs font-mono uppercase hover:border-red-600 transition-colors">Accessories</button>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12" id="product-grid">
-                <!-- Products injected via JS -->
-            </div>
-        </div>
-    </section>
-
-    <!-- About Section -->
-    <section id="about" class="py-24 md:py-32 px-4 md:px-8 bg-[#0D1630]">
-        <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 md:gap-24 items-center">
-            <div class="order-2 lg:order-1">
-                <div class="relative group">
-                    <div class="absolute -inset-4 md:-inset-8 border-2 border-red-600/30 group-hover:border-red-600 transition-colors duration-500"></div>
-                    <img src="https://images.unsplash.com/photo-1544433100-3f0449492f25?q=80&w=2070&auto=format&fit=crop" alt="Nissan S13 Drift Car" class="relative z-10 w-full grayscale contrast-125 group-hover:grayscale-0 group-hover:scale-[1.02] transition-all duration-700 glow-border">
-                    <div class="absolute -bottom-6 -right-6 md:-bottom-10 md:-right-10 bg-red-600 px-6 md:px-10 py-4 md:py-6 z-20 hidden md:block clip-slant shadow-2xl">
-                        <span class="font-display text-4xl md:text-6xl text-white italic">S13 SILVIA</span>
-                    </div>
-                </div>
-            </div>
-            <div class="order-1 lg:order-2">
-                <h2 class="text-6xl md:text-8xl mb-8">The <span class="text-red-600">Vision</span></h2>
-                <div class="space-y-6">
-                    <p class="text-xl md:text-2xl text-white/80 font-light leading-relaxed">Living my dream life, building cool cars one project at a time. This isn't just about drifting; it's about the culture, the community, and the constant pursuit of perfection sideways.</p>
-                    <p class="text-lg text-white/50 font-light leading-relaxed">Every piece of gear is designed with the same intensity we bring to the track. Built to last, styled for the street.</p>
-                </div>
-                <div class="flex flex-wrap gap-8 mt-12">
-                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="group flex items-center gap-4">
-                        <div class="w-12 h-12 flex items-center justify-center bg-white/5 group-hover:bg-red-600 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <div class="p-8 md:p-12">
+                <!-- STEP 1: SHIPPING -->
+                <div id="step-1" class="checkout-section active">
+                    <h2 class="text-3xl font-display mb-2">WHERE TO <span class="text-red-600">SHIP?</span></h2>
+                    <p class="font-mono text-white/40 text-xs mb-8">Enter your details for fast delivery.</p>
+                    
+                    <form id="shipping-form" onsubmit="event.preventDefault(); goToStep(2);" class="grid md:grid-cols-2 gap-6">
+                        <div class="input-group md:col-span-1">
+                            <label>FIRST NAME</label>
+                            <input type="text" required id="ship-fname">
                         </div>
-                        <span class="font-display text-xl uppercase tracking-widest">YouTube</span>
-                    </a>
-                    <a href="#" class="group flex items-center gap-4">
-                        <div class="w-12 h-12 flex items-center justify-center bg-white/5 group-hover:bg-red-600 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        <div class="input-group md:col-span-1">
+                            <label>LAST NAME</label>
+                            <input type="text" required id="ship-lname">
                         </div>
-                        <span class="font-display text-xl uppercase tracking-widest">Instagram</span>
-                    </a>
+                        <div class="input-group md:col-span-2">
+                            <label>ADDRESS</label>
+                            <input type="text" required placeholder="Street Address" id="ship-address">
+                        </div>
+                        <div class="input-group md:col-span-1">
+                            <label>CITY</label>
+                            <input type="text" required id="ship-city">
+                        </div>
+                        <div class="input-group md:col-span-1">
+                            <label>ZIP / POSTAL CODE</label>
+                            <input type="text" required id="ship-zip">
+                        </div>
+                        <div class="input-group md:col-span-2">
+                            <label>COUNTRY</label>
+                            <select id="ship-country">
+                                <option value="US">United States</option>
+                                <option value="UK">United Kingdom</option>
+                                <option value="CA">Canada</option>
+                                <option value="AU">Australia</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="md:col-span-2 mt-4 bg-white text-black font-display uppercase tracking-widest py-4 hover:bg-red-600 hover:text-white transition-colors clip-slant hover-trigger">
+                            Next: Payment
+                        </button>
+                    </form>
                 </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Contact Section -->
-    <section id="contact" class="py-24 md:py-32 px-4 md:px-8 bg-[#0A1128]">
-        <div class="max-w-4xl mx-auto">
-            <div class="grid lg:grid-cols-2 gap-16 md:gap-24">
-                <div>
-                    <h2 class="text-6xl md:text-8xl mb-8">Contact <span class="text-red-600">Base</span></h2>
-                    <p class="text-xl text-white/50 mb-12 font-light">Collaborations, sponsorships, or order inquiries. Our team is ready.</p>
-                    <div class="space-y-4 font-mono text-sm uppercase tracking-[0.2em]">
-                        <p class="text-red-600">Email: <span class="text-white hover:text-red-600 transition-colors cursor-pointer">contact@davidmyalik.com</span></p>
-                        <p class="text-red-600">Status: <span class="text-white">Active Pursuit</span></p>
-                    </div>
+                <!-- STEP 2: PAYMENT -->
+                <div id="step-2" class="checkout-section">
+                    <h2 class="text-3xl font-display mb-2">SECURE <span class="text-red-600">PAYMENT</span></h2>
+                    <p class="font-mono text-white/40 text-xs mb-8">256-bit SSL Encryption. You are safe.</p>
+                    
+                    <form id="payment-form" onsubmit="event.preventDefault(); processPayment();">
+                        <div class="bg-white/5 p-6 border border-white/10 mb-6">
+                            <div class="flex justify-between mb-4">
+                                <span class="font-mono text-xs text-white/50">CARD HOLDER</span>
+                                <span class="font-mono text-sm tracking-widest" id="display-name">NAME ON CARD</span>
+                            </div>
+                            <div class="input-group mb-6">
+                                <label>CARD NUMBER</label>
+                                <div class="relative">
+                                    <input type="text" placeholder="0000 0000 0000 0000" maxlength="19" class="pl-12">
+                                    <div class="absolute left-4 top-3.5 text-white/50">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="input-group">
+                                    <label>EXPIRY DATE</label>
+                                    <input type="text" placeholder="MM/YY" maxlength="5">
+                                </div>
+                                <div class="input-group">
+                                    <label>CVC</label>
+                                    <input type="text" placeholder="123" maxlength="3">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mb-6 font-display text-xl tracking-wider">
+                            <span class="text-white/50">TOTAL PAYABLE</span>
+                            <span id="checkout-total-display" class="text-red-600">$0.00</span>
+                        </div>
+
+                        <button type="submit" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden hover-trigger">
+                            Complete Purchase
+                        </button>
+                        <p class="text-center text-white/20 text-[10px] mt-4 font-mono uppercase">By clicking complete, you agree to the terms.</p>
+                    </form>
                 </div>
-                <form class="space-y-6" onsubmit="event.preventDefault(); alert('Transmission received. We will respond shortly.');">
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <input type="text" placeholder="NAME" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20">
-                        <input type="email" placeholder="EMAIL" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20">
+
+                <!-- STEP 3: CONFIRMATION -->
+                <div id="step-3" class="checkout-section text-center py-10">
+                    <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.5)]">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </div>
-                    <select class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors text-white/20">
-                        <option value="">REASON FOR TRANSMISSION</option>
-                        <option value="order">ORDER INQUIRY</option>
-                        <option value="collab">COLLABORATION</option>
-                        <option value="business">BUSINESS</option>
-                    </select>
-                    <textarea placeholder="MESSAGE" rows="5" required class="w-full bg-white/5 border border-white/10 px-6 py-4 font-mono text-sm focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/20"></textarea>
-                    <button type="submit" class="w-full bg-red-600 text-white font-display text-2xl uppercase tracking-widest py-6 hover:bg-white hover:text-black transition-all clip-slant group">
-                        Send Transmission <span class="inline-block transition-transform group-hover:translate-x-2 ml-4">→</span>
+                    <h2 class="text-4xl font-display mb-4">ORDER <span class="text-green-500">CONFIRMED</span></h2>
+                    <p class="text-white/60 font-mono mb-8">Get ready to drift. Your gear is being prepared.</p>
+                    
+                    <div class="bg-white/5 p-6 border border-white/10 text-left max-w-sm mx-auto mb-8">
+                        <div class="flex justify-between mb-2 text-sm font-mono border-b border-white/10 pb-2">
+                            <span class="text-white/50">ORDER ID</span>
+                            <span id="order-id" class="text-white">#DM-0000</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-mono">
+                            <span class="text-white/50">EST. DELIVERY</span>
+                            <span class="text-white">3-5 Business Days</span>
+                        </div>
+                    </div>
+
+                    <button onclick="closeCheckout()" class="px-12 py-3 border border-white/30 text-white hover:bg-white hover:text-black transition-all font-display uppercase tracking-widest hover-trigger">
+                        Return to Store
                     </button>
-                </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HERO SECTION -->
+    <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden pt-20">
+        <div class="absolute inset-0 bg-gradient-to-t from-[#050810] via-transparent to-transparent z-10"></div>
+        <img src="https://images.unsplash.com/photo-1621213327685-6d09e99c1040?q=80&w=2070&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover grayscale opacity-40 scale-105 animate-[pulse_10s_ease-in-out_infinite_alternate]">
+        <div class="relative z-20 text-center px-4 max-w-5xl">
+            <h1 class="text-[20vw] md:text-[16vw] leading-none font-black glitch-wrapper tracking-tighter reveal">
+                <span class="glitch-text" data-text="MYALIK">MYALIK</span>
+            </h1>
+            <p class="mt-4 text-lg md:text-2xl font-mono text-red-600 uppercase tracking-[0.5em] animate-pulse reveal">Sideways Always • Est. 2026</p>
+            
+            <div class="mt-16 reveal">
+                <a href="#shop" class="group relative inline-block px-12 py-5 bg-red-600 text-white font-display text-2xl uppercase tracking-widest transition-all clip-slant hover:bg-white hover:text-black shadow-[0_0_40px_rgba(255,0,0,0.4)] hover-trigger">
+                    <span class="relative z-10">Shop The Drop</span>
+                    <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-0"></div>
+                </a>
             </div>
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="py-16 px-4 md:px-8 border-t border-white/10 bg-[#0A1128]">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-            <div class="text-center md:text-left">
-                <a href="#" class="text-3xl font-display italic tracking-tighter mb-4 block">DAVID <span class="text-red-600">MYALIK</span></a>
-                <p class="font-mono text-white/20 text-xs tracking-[0.2em] uppercase">Built for high performance</p>
+    <!-- SHOP SECTION -->
+    <section id="shop" class="py-24 md:py-32 px-4 md:px-8 border-t border-white/5 bg-[#050810]">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 reveal">
+                <div>
+                    <h2 class="text-6xl md:text-9xl mb-2">LATEST <span class="text-red-600">DROPS</span></h2>
+                    <p class="font-mono text-white/40 text-sm uppercase tracking-[0.3em]">Premium Drift Culture Apparel</p>
+                </div>
+                <div class="hidden md:block">
+                    <div class="text-right font-mono text-xs text-white/30">
+                        <p>SCROLL TO EXPLORE</p>
+                        <p>↓</p>
+                    </div>
+                </div>
             </div>
-            <div class="flex gap-12 font-display text-sm tracking-widest uppercase text-white/40">
-                <a href="#" class="hover:text-white transition-colors">Privacy</a>
-                <a href="#" class="hover:text-white transition-colors">Shipping</a>
-                <a href="#" class="hover:text-white transition-colors">Terms</a>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12" id="product-grid">
+                <!-- JS Will Inject Products Here -->
             </div>
-            <p class="font-mono text-white/20 text-[10px] tracking-widest uppercase">© Copyright 2026 DAVID MYALIK. All Rights Reserved.</p>
+        </div>
+    </section>
+
+    <!-- ABOUT SECTION -->
+    <section id="about" class="py-24 md:py-32 px-4 md:px-8 bg-[#0f1623]">
+        <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+            <div class="relative group reveal">
+                <div class="absolute -inset-4 border-2 border-red-600/20 group-hover:border-red-600 transition-colors duration-500 z-0"></div>
+                <img src="https://images.unsplash.com/photo-1544433100-3f0449492f25?q=80&w=2070&auto=format&fit=crop" alt="S13 Drift" class="relative z-10 w-full grayscale contrast-125 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700">
+            </div>
+            <div class="reveal">
+                <h2 class="text-6xl md:text-8xl mb-8">THE <span class="text-red-600">GRIND</span></h2>
+                <p class="text-xl text-white/70 font-light leading-relaxed mb-6">
+                    Building the S13 wasn't about the car. It was about the mindset. Sideways Always isn't just a brand; it's a commitment to the craft, the smoke, and the endless pursuit of the perfect line.
+                </p>
+                <div class="flex gap-6 mt-8">
+                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="hover:text-red-600 transition-colors hover-trigger">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="py-16 px-4 border-t border-white/5 bg-[#050810]">
+        <div class="max-w-7xl mx-auto text-center">
+            <h2 class="text-4xl font-display italic mb-4">DAVID <span class="text-red-600">MYALIK</span></h2>
+            <p class="font-mono text-white/20 text-xs uppercase tracking-[0.2em]">© 2026 Sideways Always. All Rights Reserved.</p>
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script>
-        // =========================================================================
-        // CONFIGURATION: ADD YOUR API DETAILS HERE
-        // =========================================================================
-        const CONFIG = {
-            // Get your key here: https://console.cloud.google.com/apis/credentials
-            // 1. Create Project -> 2. Enable YouTube Data API v3 -> 3. Create API Key
-            apiKey: 'YOUR_GOOGLE_API_KEY_HERE', 
-            
-            // Channel ID has been updated for David Myalik
-            channelId: 'UCsQ5aY2YA7GEQarVbr21qcw' 
-        };
-
-        // =========================================================================
-        // SHOPPING CART & UI LOGIC
-        // =========================================================================
-        let cart = [];
-        const cartCount = document.getElementById('cart-count');
-        function updateCart() {
-            cartCount.innerText = cart.length;
-            cartCount.classList.add('animate-bounce');
-            setTimeout(() => cartCount.classList.remove('animate-bounce'), 500);
-        }
-        function addToCart(productId) {
-            const product = products.find(p => p.id === productId);
-            if (product) {
-                cart.push(product);
-                updateCart();
-                // alert(`${product.name} added to cart!`); 
-            }
-        }
-        function checkout() {
-            if (cart.length === 0) {
-                alert('Your cart is empty!');
-                return;
-            }
-            alert('Redirecting to secure checkout...');
-        }
-        document.getElementById('cart-button').addEventListener('click', checkout);
-
-        // Menu Logic
-        const menuToggle = document.getElementById('menu-toggle');
-        const menuClose = document.getElementById('menu-close');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileLinks = document.querySelectorAll('.mobile-link');
-        menuToggle.addEventListener('click', () => {
-            mobileMenu.classList.remove('hidden-menu');
-            document.body.style.overflow = 'hidden';
-        });
-        const closeMenu = () => {
-            mobileMenu.classList.add('hidden-menu');
-            document.body.style.overflow = 'auto';
-        };
-        menuClose.addEventListener('click', closeMenu);
-        mobileLinks.forEach(link => link.addEventListener('click', closeMenu));
-
-        // Product Data
+        // --- PRODUCT DATA ---
         const products = [
-            { id: 1, name: "Signature S13 Hoodie", price: 55, img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800", cat: "APPAREL" },
-            { id: 2, name: "Tire Slayer Tee", price: 30, img: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800", cat: "APPAREL" },
-            { id: 3, name: "Drift Team Sticker Pack", price: 12, img: "https://images.unsplash.com/photo-1572375992501-4f0f235addaa?w=800", cat: "ACCESSORIES" },
-            { id: 4, name: "Sideways Cap", price: 35, img: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800", cat: "ACCESSORIES" },
-            { id: 5, name: "Racing Socks", price: 18, img: "https://images.unsplash.com/photo-1582967702221-b1710fe04243?w=800", cat: "ACCESSORIES" },
-            { id: 6, name: "Turbo Keychain", price: 15, img: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800", cat: "ACCESSORIES" }
+            { id: 1, name: "Signature S13 Hoodie", price: 65.00, img: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800" },
+            { id: 2, name: "Tire Slayer Tee", price: 35.00, img: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800" },
+            { id: 3, name: "Drift Team Cap", price: 30.00, img: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800" },
+            { id: 4, name: "Turbo Keychain", price: 15.00, img: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800" },
+            { id: 5, name: "Racing Gloves", price: 45.00, img: "https://images.unsplash.com/photo-1612690669207-6b914a3c4c1d?w=800" },
+            { id: 6, name: "Sticker Pack Vol.1", price: 12.00, img: "https://images.unsplash.com/photo-1572375992501-4f0f235addaa?w=800" }
         ];
-        const grid = document.getElementById('product-grid');
-        products.forEach(p => {
-            grid.innerHTML += `
-                <div class="product-card group cursor-pointer" onclick="addToCart(${p.id})">
-                    <div class="relative aspect-[4/5] overflow-hidden bg-white/5 border border-white/10">
-                        <div class="absolute top-4 left-4 z-20 bg-black/80 px-3 py-1 border border-white/10">
-                            <span class="font-mono text-[10px] text-white tracking-widest uppercase">${p.cat}</span>
+
+        let cart = [];
+        const SHIPPING_COST = 15.00;
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initCursor();
+            renderProducts();
+            initScrollAnimations();
+        });
+
+        // --- UI: CUSTOM CURSOR ---
+        function initCursor() {
+            const cursor = document.getElementById('cursor');
+            
+            document.addEventListener('mousemove', (e) => {
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+            });
+
+            document.querySelectorAll('.hover-trigger').forEach(el => {
+                el.addEventListener('mouseenter', () => cursor.classList.add('hovered'));
+                el.addEventListener('mouseleave', () => cursor.classList.remove('hovered'));
+            });
+        }
+
+        // --- UI: SCROLL ANIMATIONS ---
+        function initScrollAnimations() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+        }
+
+        // --- SHOP LOGIC ---
+        function renderProducts() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = products.map(p => `
+                <div class="product-card group relative reveal hover-trigger">
+                    <div class="relative aspect-[4/5] overflow-hidden bg-white/5 border border-white/5">
+                        <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <button onclick="addToCart(${p.id})" class="bg-white text-black font-display uppercase tracking-widest px-8 py-3 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 hover:bg-red-600 hover:text-white">
+                                Add to Cart
+                            </button>
                         </div>
-                        <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover grayscale brightness-75 transition-all">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                            <button class="bg-red-600 text-white font-display uppercase tracking-widest px-8 py-3 clip-slant">Quick Add</button>
-                        </div>
-                        <div class="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                     </div>
-                    <div class="mt-8 flex justify-between items-start">
-                        <div>
-                            <h3 class="text-2xl md:text-3xl tracking-tight">${p.name}</h3>
-                            <p class="font-mono text-[10px] text-white/30 uppercase mt-1 tracking-widest">In Stock • Limited Release</p>
-                        </div>
-                        <span class="font-display text-2xl md:text-3xl text-red-600 tracking-tighter">$${p.price}</span>
+                    <div class="mt-6 text-center md:text-left">
+                        <h3 class="text-xl md:text-2xl tracking-tight font-bold">${p.name}</h3>
+                        <p class="font-mono text-red-600 text-lg">$${p.price.toFixed(2)}</p>
                     </div>
                 </div>
-            `;
-        });
+            `).join('');
+        }
 
-        // =========================================================================
-        // YOUTUBE API LOGIC
-        // =========================================================================
-        
-        async function initYouTubeData() {
-            if (CONFIG.apiKey === 'YOUR_GOOGLE_API_KEY_HERE') {
-                console.warn('YouTube API Key missing. Please edit the CONFIG object in the HTML file.');
-                return;
-            }
-
-            try {
-                let channelId = CONFIG.channelId;
-
-                // 1. Check Live Status
-                // We search for 'live' events.
-                const liveUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet,id&channelId=${channelId}&eventType=live&type=video&key=${CONFIG.apiKey}`;
-                const liveRes = await fetch(liveUrl);
-                const liveData = await liveRes.json();
-
-                const liveBadge = document.getElementById('live-badge');
-                if (liveData.pageInfo.totalResults > 0) {
-                    // User is live
-                    liveBadge.classList.remove('hidden');
-                    liveBadge.classList.add('flex');
-                    // Update live link
-                    liveBadge.href = `https://www.youtube.com/watch?v=${liveData.items[0].id.videoId}`;
-                }
-
-                // 2. Get Latest Video
-                // Order by date to get the most recent upload
-                const videoUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&type=video&maxResults=1&key=${CONFIG.apiKey}`;
-                const videoRes = await fetch(videoUrl);
-                const videoData = await videoRes.json();
-
-                if (videoData.items && videoData.items.length > 0) {
-                    const latestVideo = videoData.items[0];
-                    const videoId = latestVideo.id.videoId;
-                    const title = latestVideo.snippet.title;
-                    
-                    // Update UI
-                    const btn = document.getElementById('latest-video-btn');
-                    const btnText = document.getElementById('latest-video-text');
-                    
-                    btn.href = `https://www.youtube.com/watch?v=${videoId}`;
-                    // Truncate title if too long
-                    btnText.innerText = title.length > 20 ? title.substring(0, 20) + '...' : title;
-                    btnText.classList.add('text-red-500'); // Make text pop
-                }
-
-            } catch (error) {
-                console.error('Error fetching YouTube data:', error);
+        // --- CART LOGIC ---
+        function toggleCart() {
+            const sidebar = document.getElementById('cart-sidebar');
+            const overlay = document.getElementById('cart-overlay');
+            
+            if (sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('opacity-100');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            } else {
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+                sidebar.classList.add('open');
             }
         }
 
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', initYouTubeData);
+        document.getElementById('cart-btn').addEventListener('click', toggleCart);
+
+        function addToCart(id) {
+            const product = products.find(p => p.id === id);
+            const existing = cart.find(i => i.id === id);
+            
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...product, qty: 1 });
+            }
+            
+            updateCartUI();
+            
+            // Auto open cart
+            if (!document.getElementById('cart-sidebar').classList.contains('open')) {
+                toggleCart();
+            }
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(i => i.id !== id);
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items');
+            const countBadge = document.getElementById('cart-count');
+            const subtotalEl = document.getElementById('cart-subtotal');
+            const shippingEl = document.getElementById('cart-shipping');
+            const totalEl = document.getElementById('cart-total');
+
+            const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
+            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const shipping = subtotal > 0 ? SHIPPING_COST : 0;
+            const total = subtotal + shipping;
+
+            countBadge.innerText = totalQty;
+            subtotalEl.innerText = `$${subtotal.toFixed(2)}`;
+            shippingEl.innerText = `$${shipping.toFixed(2)}`;
+            totalEl.innerText = `$${total.toFixed(2)}`;
+
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="text-center text-white/20 font-mono mt-10">Cart is empty.</div>';
+            } else {
+                container.innerHTML = cart.map(item => `
+                    <div class="flex gap-4 border-b border-white/5 pb-4">
+                        <img src="${item.img}" class="w-16 h-16 object-cover grayscale">
+                        <div class="flex-1">
+                            <h4 class="font-bold uppercase text-sm">${item.name}</h4>
+                            <p class="font-mono text-xs text-white/50">$${item.price} x ${item.qty}</p>
+                        </div>
+                        <button onclick="removeFromCart(${item.id})" class="text-white/30 hover:text-red-500 transition-colors">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- CHECKOUT LOGIC ---
+        const modal = document.getElementById('checkout-modal');
+
+        function startCheckout() {
+            if (cart.length === 0) {
+                alert("Your cart is empty!");
+                return;
+            }
+            toggleCart();
+            modal.classList.remove('hidden');
+            updateCheckoutTotal();
+        }
+
+        function closeCheckout() {
+            modal.classList.add('hidden');
+            // Reset steps
+            goToStep(1);
+            // Clear Cart? No, maybe they want to buy more later.
+        }
+
+        function updateCheckoutTotal() {
+            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const total = subtotal + SHIPPING_COST;
+            document.getElementById('checkout-total-display').innerText = `$${total.toFixed(2)}`;
+            
+            // Update Name on Card preview
+            const fname = document.getElementById('ship-fname').value || "NAME";
+            const lname = document.getElementById('ship-lname').value || "ON CARD";
+            document.getElementById('display-name').innerText = `${fname.toUpperCase()} ${lname.toUpperCase()}`;
+        }
+
+        // Step Navigation
+        function goToStep(step) {
+            document.querySelectorAll('.checkout-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(`step-${step}`).classList.add('active');
+
+            // Update Indicators
+            for(let i=1; i<=3; i++) {
+                const ind = document.getElementById(`step-${i}-indicator`);
+                if (i < step) {
+                    ind.className = "w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator completed";
+                    ind.innerHTML = "✓";
+                } else if (i === step) {
+                    ind.className = "w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator active";
+                    ind.innerHTML = i;
+                } else {
+                    ind.className = "w-8 h-8 rounded-full border border-white/30 flex items-center justify-center font-mono text-xs step-indicator";
+                    ind.innerHTML = i;
+                }
+            }
+            
+            if(step === 2) updateCheckoutTotal();
+        }
+
+        function processPayment() {
+            // Simulation of Payment Gateway Processing
+            const btn = document.querySelector('#payment-form button');
+            const originalText = btn.innerText;
+            
+            btn.innerHTML = `<span class="animate-pulse">PROCESSING PAYMENT...</span>`;
+            btn.disabled = true;
+
+            setTimeout(() => {
+                // SUCCESS
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
+                // Generate Random Order ID
+                document.getElementById('order-id').innerText = '#DM-' + Math.floor(100000 + Math.random() * 900000);
+                
+                goToStep(3);
+                
+                // Clear Cart
+                cart = [];
+                updateCartUI();
+                
+            }, 2500); // 2.5 second delay to simulate bank processing
+        }
+
+        // --- MOBILE MENU ---
+        const menuBtn = document.getElementById('menu-btn');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const mobileLinks = document.querySelectorAll('.mobile-link');
+
+        menuBtn.addEventListener('click', () => {
+            mobileMenu.style.transform = 'translateY(0)';
+        });
+
+        function closeMobileMenu() {
+            mobileMenu.style.transform = 'translateY(-100%)';
+        }
+
+        closeMenuBtn.addEventListener('click', closeMobileMenu);
+        mobileLinks.forEach(l => l.addEventListener('click', closeMobileMenu));
 
     </script>
 </body>
