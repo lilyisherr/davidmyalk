@@ -18,7 +18,7 @@
             --font-body: 'Oswald', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
-        * { box-sizing: border-box; cursor: none; /* Hide default cursor */ }
+        * { box-sizing: border-box; } /* Cursor styling removed */
         html { scroll-behavior: smooth; }
         
         body {
@@ -33,25 +33,6 @@
         /* Typography */
         h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; line-height: 0.9; }
         
-        /* Custom Cursor */
-        #cursor {
-            position: fixed;
-            top: 0; left: 0;
-            width: 20px; height: 20px;
-            border: 2px solid var(--primary);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            transform: translate(-50%, -50%);
-            transition: width 0.2s, height 0.2s, background-color 0.2s;
-            mix-blend-mode: difference;
-        }
-        #cursor.hovered {
-            width: 50px; height: 50px;
-            background-color: rgba(255, 0, 0, 0.2);
-            border-color: transparent;
-        }
-
         /* Glitch Effect */
         .glitch-wrapper { position: relative; display: inline-block; }
         .glitch-text { position: relative; display: inline-block; }
@@ -158,30 +139,26 @@
 
         @media (max-width: 768px) {
             h1 { font-size: 18vw !important; }
-            #cursor { display: none; } /* Disable custom cursor on touch */
-            * { cursor: auto; }
         }
     </style>
 </head>
 <body>
     
-    <!-- Custom Cursor -->
-    <div id="cursor"></div>
     <div class="gritty-overlay"></div>
 
     <!-- Navigation -->
     <nav class="fixed top-0 w-full z-50 bg-navy/80 backdrop-blur-md border-b border-white/5 px-6 py-4">
         <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
-            <a href="#home" class="text-2xl md:text-3xl font-display italic tracking-tighter hover-trigger">DAVID <span class="text-red-600">MYALIK</span></a>
+            <a href="#home" class="text-2xl md:text-3xl font-display italic tracking-tighter">DAVID <span class="text-red-600">MYALIK</span></a>
             
             <div class="hidden md:flex gap-10">
-                <a href="#shop" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">Shop</a>
-                <a href="#about" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">About</a>
-                <a href="#contact" class="nav-link uppercase tracking-widest text-xs font-bold hover-trigger">Contact</a>
+                <a href="#shop" class="nav-link uppercase tracking-widest text-xs font-bold">Shop</a>
+                <a href="#about" class="nav-link uppercase tracking-widest text-xs font-bold">About</a>
+                <a href="#contact" class="nav-link uppercase tracking-widest text-xs font-bold">Contact</a>
             </div>
 
             <div class="flex items-center gap-6">
-                <button class="relative hover:text-red-600 transition-colors group hover-trigger" aria-label="View Cart" id="cart-btn">
+                <button class="relative hover:text-red-600 transition-colors group" aria-label="View Cart" id="cart-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:scale-110 transition-transform"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
                     <span class="absolute -top-2 -right-2 bg-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full ring-2 ring-[#050810]" id="cart-count">0</span>
                 </button>
@@ -206,7 +183,7 @@
     <div id="cart-sidebar" class="fixed top-0 right-0 h-full w-full md:w-[450px] bg-[#050810] z-[80] cart-sidebar flex flex-col border-l border-white/10 shadow-2xl">
         <div class="p-6 border-b border-white/5 flex justify-between items-center">
             <h2 class="text-2xl font-display tracking-widest">YOUR <span class="text-red-600">HAUL</span></h2>
-            <button onclick="toggleCart()" class="hover:text-red-600 transition-colors hover-trigger">✕</button>
+            <button onclick="toggleCart()" class="hover:text-red-600 transition-colors">✕</button>
         </div>
         
         <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-6">
@@ -222,7 +199,7 @@
                     <span id="cart-total" class="text-red-600">$0.00</span>
                 </div>
             </div>
-            <button onclick="startCheckout()" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden hover-trigger">
+            <button onclick="startCheckout()" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden">
                 Checkout Now
             </button>
         </div>
@@ -247,7 +224,7 @@
                 </div>
             </div>
 
-            <button onclick="closeCheckout()" class="absolute top-6 right-6 text-white/50 hover:text-white transition-colors hover-trigger">✕</button>
+            <button onclick="closeCheckout()" class="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">✕</button>
             
             <div class="p-8 md:p-12">
                 <!-- STEP 1: SHIPPING -->
@@ -285,7 +262,7 @@
                                 <option value="AU">Australia</option>
                             </select>
                         </div>
-                        <button type="submit" class="md:col-span-2 mt-4 bg-white text-black font-display uppercase tracking-widest py-4 hover:bg-red-600 hover:text-white transition-colors clip-slant hover-trigger">
+                        <button type="submit" class="md:col-span-2 mt-4 bg-white text-black font-display uppercase tracking-widest py-4 hover:bg-red-600 hover:text-white transition-colors clip-slant">
                             Next: Payment
                         </button>
                     </form>
@@ -328,7 +305,7 @@
                             <span id="checkout-total-display" class="text-red-600">$0.00</span>
                         </div>
 
-                        <button type="submit" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden hover-trigger">
+                        <button type="submit" class="w-full bg-red-600 text-white font-display text-xl uppercase tracking-widest py-4 hover:bg-white hover:text-black transition-all clip-slant relative overflow-hidden">
                             Complete Purchase
                         </button>
                         <p class="text-center text-white/20 text-[10px] mt-4 font-mono uppercase">By clicking complete, you agree to the terms.</p>
@@ -354,7 +331,7 @@
                         </div>
                     </div>
 
-                    <button onclick="closeCheckout()" class="px-12 py-3 border border-white/30 text-white hover:bg-white hover:text-black transition-all font-display uppercase tracking-widest hover-trigger">
+                    <button onclick="closeCheckout()" class="px-12 py-3 border border-white/30 text-white hover:bg-white hover:text-black transition-all font-display uppercase tracking-widest">
                         Return to Store
                     </button>
                 </div>
@@ -373,7 +350,7 @@
             <p class="mt-4 text-lg md:text-2xl font-mono text-red-600 uppercase tracking-[0.5em] animate-pulse reveal">Sideways Always • Est. 2026</p>
             
             <div class="mt-16 reveal">
-                <a href="#shop" class="group relative inline-block px-12 py-5 bg-red-600 text-white font-display text-2xl uppercase tracking-widest transition-all clip-slant hover:bg-white hover:text-black shadow-[0_0_40px_rgba(255,0,0,0.4)] hover-trigger">
+                <a href="#shop" class="group relative inline-block px-12 py-5 bg-red-600 text-white font-display text-2xl uppercase tracking-widest transition-all clip-slant hover:bg-white hover:text-black shadow-[0_0_40px_rgba(255,0,0,0.4)]">
                     <span class="relative z-10">Shop The Drop</span>
                     <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-0"></div>
                 </a>
@@ -416,7 +393,7 @@
                     Building the S13 wasn't about the car. It was about the mindset. Sideways Always isn't just a brand; it's a commitment to the craft, the smoke, and the endless pursuit of the perfect line.
                 </p>
                 <div class="flex gap-6 mt-8">
-                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="hover:text-red-600 transition-colors hover-trigger">
+                    <a href="https://www.youtube.com/@davidmyalik" target="_blank" class="hover:text-red-600 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                     </a>
                 </div>
@@ -448,25 +425,9 @@
 
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
-            initCursor();
             renderProducts();
             initScrollAnimations();
         });
-
-        // --- UI: CUSTOM CURSOR ---
-        function initCursor() {
-            const cursor = document.getElementById('cursor');
-            
-            document.addEventListener('mousemove', (e) => {
-                cursor.style.left = e.clientX + 'px';
-                cursor.style.top = e.clientY + 'px';
-            });
-
-            document.querySelectorAll('.hover-trigger').forEach(el => {
-                el.addEventListener('mouseenter', () => cursor.classList.add('hovered'));
-                el.addEventListener('mouseleave', () => cursor.classList.remove('hovered'));
-            });
-        }
 
         // --- UI: SCROLL ANIMATIONS ---
         function initScrollAnimations() {
@@ -485,7 +446,7 @@
         function renderProducts() {
             const grid = document.getElementById('product-grid');
             grid.innerHTML = products.map(p => `
-                <div class="product-card group relative reveal hover-trigger">
+                <div class="product-card group relative reveal">
                     <div class="relative aspect-[4/5] overflow-hidden bg-white/5 border border-white/5">
                         <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -632,29 +593,40 @@
             if(step === 2) updateCheckoutTotal();
         }
 
-        function processPayment() {
-            // Simulation of Payment Gateway Processing
+        // REAL STRIPE CHECKOUT LOGIC
+        async function processPayment() {
             const btn = document.querySelector('#payment-form button');
             const originalText = btn.innerText;
             
-            btn.innerHTML = `<span class="animate-pulse">PROCESSING PAYMENT...</span>`;
+            // Show loading state
+            btn.innerHTML = `<span class="animate-pulse">INITIALIZING SECURE CHECKOUT...</span>`;
             btn.disabled = true;
 
-            setTimeout(() => {
-                // SUCCESS
+            try {
+                // 1. Send cart data to Netlify Function
+                const response = await fetch('/.netlify/functions/checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cart: cart }) 
+                });
+
+                const session = await response.json();
+
+                if (session.url) {
+                    // 2. Redirect user to Stripe's secure page
+                    window.location.href = session.url;
+                } else {
+                    throw new Error('Failed to create session');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('There was an error initializing the payment. Please make sure the API folder is set up correctly in your repo.');
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                
-                // Generate Random Order ID
-                document.getElementById('order-id').innerText = '#DM-' + Math.floor(100000 + Math.random() * 900000);
-                
-                goToStep(3);
-                
-                // Clear Cart
-                cart = [];
-                updateCartUI();
-                
-            }, 2500); // 2.5 second delay to simulate bank processing
+            }
         }
 
         // --- MOBILE MENU ---
