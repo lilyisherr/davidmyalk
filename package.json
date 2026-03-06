@@ -1,7 +1,11 @@
 {
   "name": "david-store",
   "version": "1.0.0",
+  "scripts": {
+    "start": "serve . -p 5000 -s"
+  },
   "dependencies": {
+    "serve": "^14.2.4",
     "stripe": "^14.0.0"
   }
 }

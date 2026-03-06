@@ -1,0 +1,124 @@
+{
+  "colorScheme": "dark",
+  "fonts": [
+    {
+      "family": "Oswald",
+      "role": "heading"
+    },
+    {
+      "family": "Anton",
+      "role": "display"
+    }
+  ],
+  "colors": {
+    "primary": "#0F1623",
+    "accent": "#DC2626",
+    "background": "#050810",
+    "textPrimary": "#FFFFFF",
+    "link": "#DC2626"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Oswald",
+      "heading": "Oswald"
+    },
+    "fontStacks": {
+      "heading": [
+        "Anton",
+        "sans-serif"
+      ],
+      "body": [
+        "Oswald",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "ui-monospace",
+        "SFMono-Regular",
+        "Menlo",
+        "Monaco",
+        "Consolas",
+        "Liberation Mono",
+        "Courier New",
+        "monospace"
+      ]
+    },
+    "fontSizes": {
+      "h1": "307.04px",
+      "h2": "24px",
+      "body": "12px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "0px"
+  },
+  "components": {
+    "buttonPrimary": {
+      "background": "#DC2626",
+      "textColor": "#FFFFFF",
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(255, 0, 0, 0.4) 0px 0px 40px 0px"
+    },
+    "buttonSecondary": {
+      "background": "#FFFFFF",
+      "textColor": "#000000",
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": null,
+    "favicon": null,
+    "ogImage": null
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Shop The Drop",
+      "reasoning": "Button #0 uses a vibrant red color (#DC2626), which is the accent color of the site, making it stand out as the primary call-to-action. The text 'Shop The Drop' is action-oriented, encouraging users to engage with the site's main purpose."
+    },
+    "secondary": {
+      "index": 1,
+      "text": "Add to Cart",
+      "reasoning": "Button #1 has a white background, contrasting with the primary button's vibrant color. It serves a supportive role with the text 'Add to Cart', which is typically a secondary action following the primary shopping action."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "bold",
+    "energy": "high",
+    "targetAudience": "young, fashion-forward individuals"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": false,
+      "llmSucceeded": false,
+      "finalSource": "none"
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}
