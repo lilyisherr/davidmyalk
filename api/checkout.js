@@ -1,5 +1,6 @@
 // api/checkout.js
-const stripe = require('stripe')('sk_test_51T7aEGB9YWRWqBOnfewaL31hksdyb6ZKSsf45ErssZTwSm6OVhr8pi7FpY4CkxaIltJrhfBLF2gyCgvQ69MjidE100PsTRDw9U'); // <-- PUT KEY HERE
+// THIS IS THE KEY DAVID SENT YOU
+const stripe = require('stripe')('sk_test_51T7aEGB9YWRWqBOnfewaL31hksdyb6ZKSsf45ErssZTwSm6OVhr8pi7FpY4CkxaIltJrhfBLF2gyCgvQ69MjidE100PsTRDw9U');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
