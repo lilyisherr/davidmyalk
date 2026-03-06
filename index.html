@@ -477,14 +477,26 @@
             btn.disabled = true;
 
             try {
+                // Determine the correct API URL
+                // If on Netlify (production), use the relative path
+                // Otherwise, we'll try to use the absolute URL if provided by the user
+                const isNetlify = window.location.hostname.includes('netlify.app');
+                const apiUrl = isNetlify ? '/.netlify/functions/checkout' : 'https://davidmyalk.netlify.app/.netlify/functions/checkout';
+
                 // Send cart data to Netlify Function
-                const response = await fetch('/.netlify/functions/checkout', {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
+                    mode: 'cors', // Enable CORS for cross-domain requests
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ cart: cart }) 
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
 
                 const session = await response.json();
 
@@ -492,12 +504,12 @@
                     // Redirect user to Stripe's secure page
                     window.location.href = session.url;
                 } else {
-                    throw new Error('Failed to create session');
+                    throw new Error('Failed to create session: No URL returned');
                 }
 
             } catch (error) {
-                console.error('Error:', error);
-                alert('Error initializing payment. Please ensure you are testing on the LIVE Netlify URL, not a local file.');
+                console.error('Checkout Error:', error);
+                alert(`Checkout Error: ${error.message}. Please ensure you are using the live site at https://davidmyalk.netlify.app`);
                 
                 // Reset UI on error
                 loading.classList.add('hidden');

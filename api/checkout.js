@@ -27,8 +27,8 @@ exports.handler = async (event) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${event.headers.host}/#success`,
-      cancel_url: `${event.headers.host}/#shop`,
+      success_url: `https://davidmyalk.netlify.app/#success`,
+      cancel_url: `https://davidmyalk.netlify.app/#shop`,
     });
 
     return {
