@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found | DAVID MYALIK</title>
+    <meta name="theme-color" content="#050810">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .error-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .error-code {
+            font-family: var(--font-display);
+            font-size: clamp(100px, 20vw, 200px);
+            font-weight: 900;
+            line-height: 1;
+            color: var(--primary);
+            text-shadow: 0 0 60px rgba(255, 0, 0, 0.3);
+        }
+        .error-title {
+            font-family: var(--font-display);
+            font-size: clamp(20px, 4vw, 36px);
+            font-weight: 700;
+            margin: 16px 0 12px;
+            text-transform: uppercase;
+        }
+        .error-desc {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-muted);
+            max-width: 400px;
+            margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+        .error-actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .error-skid {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: rgba(255,255,255,0.15);
+            margin-top: 60px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-page">
+        <div>
+            <div class="error-code">404</div>
+            <h1 class="error-title">WRONG <span class="text-red">LINE</span></h1>
+            <p class="error-desc">You've drifted off course. The page you're looking for doesn't exist or has been moved.</p>
+            <div class="error-actions">
+                <a href="/" class="btn btn-primary" style="padding:14px 32px;">BACK TO HOME</a>
+                <a href="/#shop" class="btn btn-secondary" style="padding:14px 32px;">SHOP THE DROP</a>
+            </div>
+            <p class="error-skid">// spun out — no grip here</p>
+        </div>
+    </div>
+</body>
+</html>
