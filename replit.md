@@ -10,7 +10,7 @@ A static e-commerce site for drift culture apparel brand "David Myalik / Sideway
 
 ## Tech Stac
 
-- Pure static HTML/CSSS (no build step)
+- Pure static HTML/CSS(no build step)
 - Tailwind CSS via CDN
 - Stripe integration via Netlify Functions (for production)
 - `serve` package for local development
