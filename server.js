@@ -468,6 +468,37 @@ app.post('/api/user/addresses', requireAuth, async (req, res) => {
     }
 });
 
+app.delete('/api/user/addresses/:id', requireAuth, async (req, res) => {
+    try {
+        const r = await pool.query('DELETE FROM user_addresses WHERE id = $1 AND user_id = $2 RETURNING id', [req.params.id, req.user.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+        res.json({ ok: true });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.patch('/api/user/addresses/:id/default', requireAuth, async (req, res) => {
+    try {
+        await pool.query('UPDATE user_addresses SET is_default = false WHERE user_id = $1', [req.user.id]);
+        await pool.query('UPDATE user_addresses SET is_default = true WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+        res.json({ ok: true });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.get('/api/user/stats', requireAuth, async (req, res) => {
+    try {
+        const [ordersCount, totalSpent, userData] = await Promise.all([
+            pool.query('SELECT COUNT(*) FROM orders WHERE user_id = $1', [req.user.id]),
+            pool.query("SELECT COALESCE(SUM(total),0) FROM orders WHERE user_id = $1 AND status != 'cancelled'", [req.user.id]),
+            pool.query('SELECT created_at FROM users WHERE id = $1', [req.user.id])
+        ]);
+        res.json({
+            totalOrders: parseInt(ordersCount.rows[0].count),
+            totalSpent: parseFloat(totalSpent.rows[0].coalesce),
+            memberSince: userData.rows[0]?.created_at
+        });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
 app.put('/api/user/profile', requireAuth, async (req, res) => {
     const { firstName, lastName, phone } = req.body;
     try {
@@ -770,9 +801,37 @@ app.post('/api/checkout/direct', requireAuth, async (req, res) => {
             ).catch(() => {});
         }
 
+        // Auto-deactivate products when stock hits 0 (if setting enabled)
+        try {
+            const autoDeact = await pool.query("SELECT value FROM settings WHERE key = 'auto_deactivate_on_zero_stock'");
+            if (autoDeact.rows[0]?.value === 'true') {
+                for (const item of cart) {
+                    await pool.query('UPDATE products SET is_active = false WHERE id = $1 AND stock <= 0', [item.id]).catch(() => {});
+                }
+            }
+        } catch(_) {}
+
         // Increment discount usage count
         if (discountCodeStr) {
             await pool.query('UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)', [discountCodeStr]).catch(() => {});
+        }
+
+        // Auto-save shipping address for logged-in users (non-fatal)
+        if (req.user && shipping?.address) {
+            try {
+                const exists = await pool.query(
+                    'SELECT id FROM user_addresses WHERE user_id = $1 AND address_line1 = $2 AND zip = $3',
+                    [req.user.id, shipping.address, shipping.zip || '']
+                );
+                if (!exists.rows.length) {
+                    const countRes = await pool.query('SELECT COUNT(*) FROM user_addresses WHERE user_id = $1', [req.user.id]);
+                    const isFirst = parseInt(countRes.rows[0].count) === 0;
+                    await pool.query(
+                        'INSERT INTO user_addresses (user_id, first_name, last_name, address_line1, city, state, zip, country, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+                        [req.user.id, shipping.firstName || '', shipping.lastName || '', shipping.address, shipping.city || '', shipping.state || '', shipping.zip || '', shipping.country || 'US', isFirst]
+                    );
+                }
+            } catch (_) {}
         }
 
         res.json({ order: r.rows[0] });
@@ -813,11 +872,14 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 });
 
 // ─── ADMIN: CATEGORIES ───────────────────────────────────────────────────────
+const DEFAULT_CATEGORIES = ['Accessories', 'Apparel', 'Footwear', 'Headwear', 'Limited Edition', 'New Arrivals', 'Stickers & Art'];
 app.get('/api/admin/categories', requireAdmin, async (req, res) => {
     try {
         const r = await pool.query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category");
-        res.json(r.rows.map(r => r.category));
-    } catch { res.json([]); }
+        const existing = r.rows.map(row => row.category);
+        const merged = [...new Set([...DEFAULT_CATEGORIES, ...existing])].sort();
+        res.json(merged);
+    } catch { res.json(DEFAULT_CATEGORIES); }
 });
 
 // ─── ADMIN: PRODUCTS ─────────────────────────────────────────────────────────

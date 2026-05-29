@@ -74,11 +74,16 @@
 
         <div class="main-content">
             <div id="orders-section">
-                <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
                     <h2 style="font-size:36px;">MY <span class="text-red">ORDERS</span></h2>
                     <span class="font-mono text-xs text-muted" id="orders-last-updated" style="font-size:10px;"></span>
                 </div>
-                <p class="font-mono text-muted text-xs mb-8">Track and manage your purchases — updates automatically</p>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px;" id="user-stats-bar">
+                    <div class="stat-card"><span class="stat-label">TOTAL ORDERS</span><div class="stat-value" id="stat-orders" style="font-size:28px;">—</div></div>
+                    <div class="stat-card"><span class="stat-label">TOTAL SPENT</span><div class="stat-value text-red" id="stat-spent" style="font-size:28px;">—</div></div>
+                    <div class="stat-card"><span class="stat-label">MEMBER SINCE</span><div class="font-mono" style="font-size:16px;margin-top:8px;" id="stat-since">—</div></div>
+                </div>
+                <p class="font-mono text-muted text-xs mb-8">Click any order for full details — updates automatically</p>
                 <div id="orders-list"></div>
             </div>
 
@@ -132,12 +137,12 @@
             </div>
 
             <div id="addresses-section" style="display:none;">
-                <div class="flex-between mb-8">
+                <div class="flex-between mb-4">
                     <div>
                         <h2 style="font-size:36px; margin-bottom:8px;">MY <span class="text-red">ADDRESSES</span></h2>
-                        <p class="font-mono text-muted text-xs">Manage your shipping addresses</p>
+                        <p class="font-mono text-muted text-xs">Saved addresses auto-fill your checkout — add or manage them here</p>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()">ADD ADDRESS</button>
+                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()">+ ADD ADDRESS</button>
                 </div>
                 <div id="addresses-list"></div>
             </div>
@@ -211,6 +216,7 @@
             document.getElementById('set-phone').value = currentUser.phone || '';
             loadOrders();
             loadAddresses();
+            loadStats();
             startOrdersPolling();
         }
 
@@ -359,26 +365,58 @@
 
         function closeOrderDetail() { document.getElementById('order-detail-modal').classList.remove('open'); }
 
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/user/stats');
+                const data = await res.json();
+                document.getElementById('stat-orders').textContent = data.totalOrders;
+                document.getElementById('stat-spent').textContent = `$${data.totalSpent.toFixed(2)}`;
+                document.getElementById('stat-since').textContent = data.memberSince
+                    ? new Date(data.memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    : '—';
+            } catch(e) {}
+        }
+
         async function loadAddresses() {
             const res = await fetch('/api/user/addresses');
             const addresses = await res.json();
             const container = document.getElementById('addresses-list');
             if (addresses.length === 0) {
-                container.innerHTML = `<div class="empty-state"><p>No saved addresses</p></div>`;
+                container.innerHTML = `<div class="empty-state">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <p>No saved addresses yet</p>
+                    <p class="font-mono" style="font-size:11px;margin-top:8px;">Addresses are automatically saved when you place an order, or you can add one below.</p>
+                    <button class="btn btn-primary btn-sm mt-4" onclick="openAddressModal()">ADD ADDRESS</button>
+                </div>`;
                 return;
             }
-            container.innerHTML = addresses.map(a => `
-                <div class="card mb-4">
-                    <div class="flex-between">
-                        <div>
-                            <p style="font-weight:600;">${a.first_name} ${a.last_name}</p>
-                            <p class="text-muted text-sm">${a.address_line1}${a.address_line2 ? ', ' + a.address_line2 : ''}</p>
-                            <p class="text-muted text-sm">${a.city}${a.state ? ', ' + a.state : ''} ${a.zip}, ${a.country}</p>
-                        </div>
-                        ${a.is_default ? '<span class="badge badge-active">Default</span>' : ''}
+            container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">` +
+                addresses.map(a => `
+                <div class="card" style="${a.is_default ? 'border-color:rgba(34,197,94,0.3);' : ''}">
+                    ${a.is_default ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;"><span class="live-dot" style="background:#22c55e;"></span><span class="font-mono text-xs" style="color:#22c55e;letter-spacing:0.1em;">DEFAULT</span></div>' : ''}
+                    <p style="font-weight:600;font-size:16px;">${a.first_name} ${a.last_name}</p>
+                    <p class="text-muted text-sm" style="margin-top:4px;">${a.address_line1}${a.address_line2 ? ', ' + a.address_line2 : ''}</p>
+                    <p class="text-muted text-sm">${a.city}${a.state ? ', ' + a.state : ''} ${a.zip}</p>
+                    <p class="text-muted text-sm">${a.country}</p>
+                    <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+                        ${!a.is_default ? `<button onclick="setDefaultAddress(${a.id})" class="btn btn-secondary btn-sm" style="font-size:10px;">SET DEFAULT</button>` : ''}
+                        <button onclick="deleteAddress(${a.id})" style="padding:6px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.05em;">DELETE</button>
                     </div>
                 </div>
-            `).join('');
+            `).join('') + `</div>`;
+        }
+
+        async function deleteAddress(id) {
+            if (!confirm('Remove this address?')) return;
+            const res = await fetch(`/api/user/addresses/${id}`, { method: 'DELETE' });
+            if (res.ok) { showToast('Address removed', 'success'); loadAddresses(); }
+            else showToast('Failed to delete address', 'error');
+        }
+
+        async function setDefaultAddress(id) {
+            const res = await fetch(`/api/user/addresses/${id}/default`, { method: 'PATCH' });
+            if (res.ok) { showToast('Default address updated', 'success'); loadAddresses(); }
+            else showToast('Failed to update', 'error');
         }
 
         function openAddressModal() { document.getElementById('address-modal').classList.add('open'); }

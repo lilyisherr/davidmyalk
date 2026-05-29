@@ -533,6 +533,7 @@
                             <button class="settings-nav-btn" data-tab="orders" onclick="showSettingsTab('orders')">Orders</button>
                             <button class="settings-nav-btn" data-tab="payment" onclick="showSettingsTab('payment')">Payment</button>
                             <button class="settings-nav-btn" data-tab="checkout" onclick="showSettingsTab('checkout')">Checkout</button>
+                            <button class="settings-nav-btn" data-tab="inventory" onclick="showSettingsTab('inventory')">Inventory</button>
                         </div>
                         <div class="settings-nav-group">
                             <span class="settings-nav-label">Marketing</span>
@@ -922,6 +923,47 @@
                     </div>
                 </div>
 
+                <!-- INVENTORY TAB -->
+                <div class="settings-panel" id="stab-inventory" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">INVENTORY <span class="text-red">MANAGEMENT</span></h3>
+                        <p class="settings-card-desc">Control how your store handles stock levels, sold-out products, and low inventory.</p>
+
+                        <div class="mb-6">
+                            <label class="input-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-auto_deactivate_on_zero_stock" style="width:16px;height:16px;accent-color:var(--primary);">
+                                AUTO-HIDE PRODUCTS WHEN OUT OF STOCK
+                            </label>
+                            <p class="font-mono text-muted" style="font-size:10px;margin-top:6px;padding-left:26px;">When a product's stock reaches 0 after an order, it is automatically hidden from the store. You'll need to manually reactivate it when restocked.</p>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="input-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-allow_backorders" style="width:16px;height:16px;accent-color:var(--primary);">
+                                ALLOW BACKORDERS
+                            </label>
+                            <p class="font-mono text-muted" style="font-size:10px;margin-top:6px;padding-left:26px;">Let customers order items even when stock is at 0. Useful for made-to-order or pre-order items.</p>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="input-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-show_low_stock_to_customers" style="width:16px;height:16px;accent-color:var(--primary);">
+                                SHOW "ONLY X LEFT!" WARNING TO CUSTOMERS
+                            </label>
+                            <p class="font-mono text-muted" style="font-size:10px;margin-top:6px;padding-left:26px;">Show a low stock warning on the store when items are running low. Uses the threshold you set below.</p>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="input-label">LOW STOCK WARNING THRESHOLD</label>
+                            <p class="font-mono text-muted" style="font-size:10px;margin-bottom:8px;">Show the "Only X left!" warning when stock is at or below this number.</p>
+                            <input type="number" min="1" max="999" class="input-field" id="set-low_stock_threshold" style="max-width:120px;" value="10">
+                        </div>
+
+                        <button class="btn btn-primary btn-sm" onclick="saveInventorySettings()">SAVE INVENTORY SETTINGS</button>
+                        <span id="inventory-save-status" class="font-mono text-xs" style="color:#22c55e;margin-left:12px;"></span>
+                    </div>
+                </div>
+
                 <!-- SEO TAB -->
                 <div class="settings-panel" id="stab-seo" style="display:none;">
                     <div class="card" style="max-width:700px;">
@@ -984,16 +1026,6 @@
                 <!-- ADVANCED TAB -->
                 <div class="settings-panel" id="stab-advanced" style="display:none;">
                     <div class="card" style="max-width:700px;">
-                        <h3 class="settings-card-title">LOW STOCK <span class="text-red">WARNING</span></h3>
-                        <p class="settings-card-desc">When a product's stock drops to this number or below, customers will see a "Only X left!" warning on the product. This creates urgency and lets shoppers know it's almost gone.</p>
-                        <div class="mb-4">
-                            <label class="input-label">SHOW WARNING WHEN STOCK IS AT OR BELOW</label>
-                            <input type="number" min="1" class="input-field" id="set-low_stock_threshold" style="max-width:120px;" value="10">
-                            <span class="font-mono text-xs text-muted">Example: Set to 5, and anything with 5 or fewer items will show "Only 5 left!"</span>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['low_stock_threshold'])">SAVE</button>
-                    </div>
-                    <div class="card" style="max-width:700px;margin-top:24px;">
                         <h3 class="settings-card-title">MAINTENANCE <span class="text-red">MODE</span></h3>
                         <p class="settings-card-desc">Need to work on your store? Turn this on and customers will see a "We'll be back soon" page instead of the store. You (the admin) can still use the site normally.</p>
                         <div class="mb-4">
@@ -1308,7 +1340,8 @@
                 'tax_enabled','checkout_terms_enabled','guest_checkout_enabled',
                 'maintenance_mode','banner_enabled',
                 'order_notification_enabled','low_stock_alert_enabled',
-                'show_out_of_stock_products','auto_reduce_stock'
+                'show_out_of_stock_products','auto_reduce_stock',
+                'auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers'
             ];
             for (const key of textFields) {
                 const el = document.getElementById('set-' + key);
@@ -1360,6 +1393,12 @@
             if (panel) panel.style.display = 'block';
             const tabBtn = document.querySelector(`.settings-nav-btn[data-tab="${tab}"]`);
             if (tabBtn) tabBtn.classList.add('active');
+        }
+
+        async function saveInventorySettings() {
+            await saveBulkSettings(['auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers','low_stock_threshold']);
+            const el = document.getElementById('inventory-save-status');
+            if (el) { el.textContent = 'Saved!'; setTimeout(() => el.textContent = '', 3000); }
         }
 
         async function saveBulkSettings(keys) {
@@ -1639,7 +1678,7 @@
         async function loadProducts() {
             const res = await fetch('/api/admin/products');
             allProducts = await res.json();
-            renderProducts(allProducts);
+            filterProducts();
             renderLowStock(allProducts);
         }
 

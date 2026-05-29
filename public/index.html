@@ -337,7 +337,13 @@
             <div style="padding:32px;">
                 <div id="checkout-step-1" class="checkout-step">
                     <h2 style="font-size:28px;margin-bottom:8px;">WHERE TO <span class="text-red">SHIP?</span></h2>
-                    <p class="font-mono text-muted" style="font-size:11px;margin-bottom:32px;">Enter your details for fast delivery.</p>
+                    <p class="font-mono text-muted" style="font-size:11px;margin-bottom:16px;">Enter your details for fast delivery.</p>
+                    <div id="saved-addr-row" style="display:none;margin-bottom:20px;">
+                        <label class="input-label" style="margin-bottom:6px;">USE SAVED ADDRESS</label>
+                        <select class="input-field" id="saved-addr-select" onchange="fillSavedAddress(this.value)">
+                            <option value="">— Select a saved address —</option>
+                        </select>
+                    </div>
                     <form id="shipping-form" onsubmit="event.preventDefault(); goToCheckoutStep(2);">
                         <div class="grid-2 mb-4">
                             <div><label class="input-label">FIRST NAME</label><input type="text" class="input-field" id="ship-fname" required></div>
@@ -659,12 +665,48 @@
                 document.getElementById('grind-link-text').textContent = grindData.linkText;
             } catch(e) {}
 
+            if (currentUser) {
+                loadSavedAddresses();
+            }
             renderCategoryFilters();
             renderProducts();
             updateCartUI();
             initScrollAnimations();
             initMobileFilters();
             handleCheckoutReturn();
+        }
+
+        let savedAddresses = [];
+        async function loadSavedAddresses() {
+            try {
+                const res = await fetch('/api/user/addresses');
+                if (!res.ok) return;
+                savedAddresses = await res.json();
+                const row = document.getElementById('saved-addr-row');
+                const sel = document.getElementById('saved-addr-select');
+                if (!row || !sel || !savedAddresses.length) return;
+                sel.innerHTML = '<option value="">— Select a saved address —</option>' +
+                    savedAddresses.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name} — ${a.address_line1}, ${a.city}${a.is_default ? ' (Default)' : ''}</option>`).join('');
+                row.style.display = 'block';
+                // Auto-fill default address
+                const def = savedAddresses.find(a => a.is_default) || savedAddresses[0];
+                if (def) fillSavedAddress(def.id);
+            } catch(e) {}
+        }
+
+        function fillSavedAddress(id) {
+            const a = savedAddresses.find(addr => addr.id == id);
+            if (!a) return;
+            document.getElementById('ship-fname').value = a.first_name || '';
+            document.getElementById('ship-lname').value = a.last_name || '';
+            document.getElementById('ship-address').value = a.address_line1 || '';
+            document.getElementById('ship-city').value = a.city || '';
+            document.getElementById('ship-state').value = a.state || '';
+            document.getElementById('ship-zip').value = a.zip || '';
+            const countryEl = document.getElementById('ship-country');
+            if (countryEl) countryEl.value = a.country || 'US';
+            const sel = document.getElementById('saved-addr-select');
+            if (sel) sel.value = id;
         }
 
         function initMobileFilters() {
