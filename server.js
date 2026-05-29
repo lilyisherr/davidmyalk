@@ -135,6 +135,12 @@ async function initDb() {
             expires_at TIMESTAMP DEFAULT NULL,
             created_at TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            subscribed_at TIMESTAMP DEFAULT NOW(),
+            is_active BOOLEAN DEFAULT true
+        );
     `);
 
     // Migrations
@@ -449,6 +455,30 @@ app.get('/api/settings/all', async (req, res) => {
     } catch { res.json({}); }
 });
 
+// ─── NEWSLETTER ──────────────────────────────────────────────────────────────
+app.post('/api/newsletter/subscribe', async (req, res) => {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'Valid email required' });
+    }
+    try {
+        await pool.query(
+            'INSERT INTO newsletter_subscribers (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET is_active = true, subscribed_at = NOW()',
+            [email.toLowerCase().trim()]
+        );
+        res.json({ message: "You're in. Welcome to the culture." });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not subscribe. Try again.' });
+    }
+});
+
+app.get('/api/admin/newsletter/subscribers', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM newsletter_subscribers WHERE is_active = true ORDER BY subscribed_at DESC');
+        res.json(r.rows);
+    } catch { res.json([]); }
+});
+
 // ─── ORDERS (user) ───────────────────────────────────────────────────────────
 app.get('/api/orders', requireAuth, async (req, res) => {
     try {
@@ -718,6 +748,26 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
                     'UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)',
                     [order.discount_code]
                 ).catch(() => {});
+            }
+
+            // Auto-save shipping address to user_addresses if not already saved
+            if (order.shipping_address && order.user_id) {
+                try {
+                    const existingAddr = await pool.query(
+                        'SELECT id FROM user_addresses WHERE user_id = $1 AND address_line1 = $2 AND zip = $3',
+                        [order.user_id, order.shipping_address, order.shipping_zip]
+                    );
+                    if (!existingAddr.rows.length) {
+                        const addrCount = await pool.query('SELECT COUNT(*) FROM user_addresses WHERE user_id = $1', [order.user_id]);
+                        const isFirst = parseInt(addrCount.rows[0].count) === 0;
+                        await pool.query(
+                            'INSERT INTO user_addresses (user_id, first_name, last_name, address_line1, city, state, zip, country, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+                            [order.user_id, order.shipping_first_name || '', order.shipping_last_name || '', order.shipping_address, order.shipping_city || '', order.shipping_state || '', order.shipping_zip || '', order.shipping_country || 'US', isFirst]
+                        );
+                    }
+                } catch (addrErr) {
+                    console.error('Address save error (non-fatal):', addrErr.message);
+                }
             }
 
             return res.json({ order });

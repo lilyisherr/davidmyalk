@@ -44,6 +44,7 @@ function renderNav(currentUser, options = {}) {
                     <a href="${shopHref}" class="nav-link">SHOP</a>
                     <a href="${aboutHref}" class="nav-link">ABOUT</a>
                     <a href="${contactHref}" class="nav-link">CONTACT</a>
+                    <a href="javascript:void(0)" class="nav-link" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" style="font-size:11px;opacity:0.7;">SIZE GUIDE</a>
                     ${authHTML}
                     ${isStore ? `
                     <button id="cart-btn" style="position:relative;background:none;border:none;color:white;cursor:pointer;" aria-label="Cart">
@@ -122,6 +123,12 @@ async function renderFooter() {
                         <a href="/help-center" class="footer-link">Help Center</a>
                         <a href="/shipping-info" class="footer-link">Shipping Info</a>
                         <a href="/returns" class="footer-link">Returns & Exchanges</a>
+                        <a href="javascript:void(0)" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" class="footer-link">Size Guide</a>
+                    </div>
+                    <div>
+                        <div class="footer-col-title">Legal</div>
+                        <a href="/privacy-policy" class="footer-link">Privacy Policy</a>
+                        <a href="/terms" class="footer-link">Terms of Service</a>
                     </div>
                 </div>
                 <div class="footer-bottom">
