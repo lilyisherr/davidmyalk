@@ -194,6 +194,16 @@ async function initDb() {
         ['policy_returns', 'We accept returns within 30 days of purchase. Items must be unworn, unwashed, and in original condition with tags attached. Sale items are final sale. To start a return, email us with your order number.'],
         ['policy_shipping', 'Orders ship within 1-3 business days. Standard shipping takes 5-7 business days. Expedited shipping is available at checkout. We ship worldwide — international orders may take 10-21 business days.'],
         ['policy_privacy', 'We collect only the information needed to process your order and improve your experience. We never sell your data to third parties. Your payment information is processed securely by Stripe and never stored on our servers.'],
+        // Notifications
+        ['admin_notification_email', ''],
+        ['order_notification_enabled', 'false'],
+        ['low_stock_alert_enabled', 'true'],
+        ['order_confirmation_message', 'Thank you for your order! We\'ll start processing it right away.'],
+        // Orders
+        ['show_out_of_stock_products', 'true'],
+        ['auto_reduce_stock', 'true'],
+        ['order_processing_days', '1-3'],
+        ['order_shipping_days', '5-7'],
     ];
     for (const [key, value] of defaults) {
         await pool.query(
@@ -489,6 +499,13 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         const { cart, shipping, discountCode } = req.body;
         if (!cart || !cart.length) return res.status(400).json({ error: 'Cart is empty' });
 
+        // Validate stock before anything else
+        for (const item of cart) {
+            const p = await pool.query('SELECT * FROM products WHERE id = $1 AND is_active = true', [item.id]);
+            if (!p.rows.length) return res.status(400).json({ error: `Product not found: ${item.name}` });
+            if (p.rows[0].stock < item.qty) return res.status(400).json({ error: `Not enough stock for ${item.name}` });
+        }
+
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host;
         const baseUrl = `${protocol}://${host}`;
@@ -502,9 +519,7 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
                  AND (usage_limit IS NULL OR usage_count < usage_limit)`,
                 [discountCode]
             );
-            if (dc.rows.length) {
-                appliedDiscount = dc.rows[0];
-            }
+            if (dc.rows.length) appliedDiscount = dc.rows[0];
         }
 
         const shippingCostRow = await pool.query("SELECT value FROM settings WHERE key = 'shipping_cost'");
@@ -515,7 +530,9 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         const effectiveShipping = (freeThreshold > 0 && subtotal >= freeThreshold) ? 0 : shippingCost;
 
         let discountAmount = 0;
+        let discountCodeStr = '';
         if (appliedDiscount) {
+            discountCodeStr = appliedDiscount.code;
             if (appliedDiscount.type === 'percentage') {
                 discountAmount = subtotal * (parseFloat(appliedDiscount.value) / 100);
             } else {
@@ -524,6 +541,33 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
             discountAmount = Math.round(discountAmount * 100) / 100;
         }
 
+        const prefix = (await pool.query("SELECT value FROM settings WHERE key = 'order_prefix'")).rows[0]?.value || 'DM';
+        const orderNum = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+        const total = Math.max(0, subtotal + effectiveShipping - discountAmount);
+
+        const items = cart.map(i => ({
+            id: i.id,
+            product_name: i.name,
+            product_image: i.image_url || '',
+            price_at_purchase: i.price,
+            quantity: i.qty
+        }));
+
+        // ─── Create order in DB BEFORE Stripe redirect ───────────────────────────
+        // This avoids Stripe's 500-char metadata limit and ensures order is always saved
+        const orderRow = await pool.query(
+            `INSERT INTO orders (order_number, user_id, status, subtotal, shipping_cost, total, discount_code, discount_amount,
+                shipping_first_name, shipping_last_name, shipping_address, shipping_city,
+                shipping_state, shipping_zip, shipping_country, items, stripe_session_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+            [orderNum, req.user.id, 'pending_payment', subtotal, effectiveShipping, total, discountCodeStr, discountAmount,
+                shipping?.firstName || '', shipping?.lastName || '', shipping?.address || '',
+                shipping?.city || '', shipping?.state || '', shipping?.zip || '', shipping?.country || 'US',
+                JSON.stringify(items), '']
+        );
+        const orderId = orderRow.rows[0].id;
+
+        // Build Stripe line items
         const lineItems = cart.map(item => ({
             price_data: {
                 currency: 'usd',
@@ -533,36 +577,8 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
             quantity: item.qty,
         }));
 
-        const sessionData = {
-            payment_method_types: ['card'],
-            line_items: lineItems,
-            mode: 'payment',
-            success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${baseUrl}/?checkout=cancelled`,
-            metadata: {
-                user_id: String(req.user.id),
-                cart: JSON.stringify(cart),
-                shipping: JSON.stringify(shipping || {}),
-                discount_code: appliedDiscount ? appliedDiscount.code : '',
-                discount_amount: String(discountAmount),
-                shipping_cost: String(effectiveShipping)
-            }
-        };
-
-        // Apply discount as a coupon if any
-        if (discountAmount > 0) {
-            const coupon = await stripe.coupons.create({
-                amount_off: Math.round(discountAmount * 100),
-                currency: 'usd',
-                duration: 'once',
-                name: appliedDiscount.code
-            });
-            sessionData.discounts = [{ coupon: coupon.id }];
-        }
-
-        // Add shipping as a line item if applicable
         if (effectiveShipping > 0) {
-            sessionData.line_items.push({
+            lineItems.push({
                 price_data: {
                     currency: 'usd',
                     product_data: { name: 'Standard Shipping' },
@@ -572,7 +588,34 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
             });
         }
 
+        const sessionData = {
+            payment_method_types: ['card'],
+            line_items: lineItems,
+            mode: 'payment',
+            success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${baseUrl}/?checkout=cancelled`,
+            metadata: {
+                order_id: String(orderId),
+                order_number: orderNum
+            }
+        };
+
+        // Apply discount as a Stripe coupon if any
+        if (discountAmount > 0) {
+            const coupon = await stripe.coupons.create({
+                amount_off: Math.round(discountAmount * 100),
+                currency: 'usd',
+                duration: 'once',
+                name: discountCodeStr
+            });
+            sessionData.discounts = [{ coupon: coupon.id }];
+        }
+
         const session = await stripe.checkout.sessions.create(sessionData);
+
+        // Link the Stripe session ID back to the order
+        await pool.query('UPDATE orders SET stripe_session_id = $1 WHERE id = $2', [session.id, orderId]);
+
         res.json({ url: session.url });
     } catch (err) {
         console.error('Checkout error:', err.message);
@@ -582,81 +625,74 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
 
 app.post('/api/checkout/complete', requireAuth, async (req, res) => {
     const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'No session ID provided' });
     try {
-        // Check if order already exists for this session
-        if (sessionId) {
-            const existing = await pool.query('SELECT * FROM orders WHERE stripe_session_id = $1', [sessionId]);
-            if (existing.rows.length) return res.json({ order: existing.rows[0] });
+        // Already confirmed? Return it immediately
+        const confirmed = await pool.query(
+            "SELECT * FROM orders WHERE stripe_session_id = $1 AND status != 'pending_payment'",
+            [sessionId]
+        );
+        if (confirmed.rows.length) return res.json({ order: confirmed.rows[0] });
+
+        // Find the pre-created pending_payment order for this session
+        const pending = await pool.query(
+            "SELECT * FROM orders WHERE stripe_session_id = $1 AND status = 'pending_payment'",
+            [sessionId]
+        );
+
+        if (pending.rows.length) {
+            // Confirm it
+            const updated = await pool.query(
+                "UPDATE orders SET status = 'pending' WHERE id = $1 RETURNING *",
+                [pending.rows[0].id]
+            );
+            const order = updated.rows[0];
+            const items = typeof order.items === 'string' ? JSON.parse(order.items || '[]') : (order.items || []);
+
+            // Decrement stock
+            for (const item of items) {
+                await pool.query(
+                    'UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2',
+                    [item.quantity, item.id]
+                ).catch(() => {});
+            }
+
+            // Increment discount usage
+            if (order.discount_code) {
+                await pool.query(
+                    'UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)',
+                    [order.discount_code]
+                ).catch(() => {});
+            }
+
+            return res.json({ order });
         }
 
-        let cart = [];
-        let shipping = {};
-
-        if (sessionId && process.env.STRIPE_SECRET_KEY) {
-            try {
-                const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-                const session = await stripe.checkout.sessions.retrieve(sessionId);
-                cart = JSON.parse(session.metadata?.cart || '[]');
-                shipping = JSON.parse(session.metadata?.shipping || '{}');
-            } catch {}
-        }
-
-        const prefix = (await pool.query("SELECT value FROM settings WHERE key = 'order_prefix'")).rows[0]?.value || 'DM';
-        const orderNum = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
-        const shippingCostRow = await pool.query("SELECT value FROM settings WHERE key = 'shipping_cost'");
-        let shippingCost = parseFloat(shippingCostRow.rows[0]?.value || '8.99');
-        const subtotal = cart.reduce((acc, i) => acc + (parseFloat(i.price) * i.qty), 0);
-
-        // Build items array matching the expected shape
-        const items = cart.map(i => ({
-            id: i.id,
-            product_name: i.name,
-            product_image: i.image_url || '',
-            price_at_purchase: i.price,
-            quantity: i.qty
-        }));
-
-        let discountAmount = 0;
-        let discountCodeStr = '';
-        if (sessionId && process.env.STRIPE_SECRET_KEY) {
+        // Fallback: look up order_number from Stripe metadata (handles older sessions)
+        if (process.env.STRIPE_SECRET_KEY) {
             try {
                 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
                 const sess = await stripe.checkout.sessions.retrieve(sessionId);
-                discountCodeStr = sess.metadata?.discount_code || '';
-                discountAmount = parseFloat(sess.metadata?.discount_amount || '0');
-                const storedShipping = parseFloat(sess.metadata?.shipping_cost || '0');
-                if (!isNaN(storedShipping)) shippingCost = storedShipping;
-            } catch {}
+                const orderNum = sess.metadata?.order_number;
+                if (orderNum) {
+                    const byNum = await pool.query('SELECT * FROM orders WHERE order_number = $1', [orderNum]);
+                    if (byNum.rows.length) {
+                        const updated = await pool.query(
+                            "UPDATE orders SET status = 'pending', stripe_session_id = $1 WHERE id = $2 RETURNING *",
+                            [sessionId, byNum.rows[0].id]
+                        );
+                        return res.json({ order: updated.rows[0] });
+                    }
+                }
+            } catch (stripeErr) {
+                console.error('Stripe session lookup error:', stripeErr.message);
+            }
         }
 
-        const total = subtotal + shippingCost - discountAmount;
-        const r = await pool.query(
-            `INSERT INTO orders (order_number, user_id, status, subtotal, shipping_cost, total, discount_code, discount_amount,
-                shipping_first_name, shipping_last_name, shipping_address, shipping_city,
-                shipping_state, shipping_zip, shipping_country, items, stripe_session_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
-            [orderNum, req.user.id, 'pending', subtotal, shippingCost, total, discountCodeStr, discountAmount,
-                shipping.firstName || '', shipping.lastName || '', shipping.address || '',
-                shipping.city || '', shipping.state || '', shipping.zip || '', shipping.country || 'US',
-                JSON.stringify(items), sessionId || '']
-        );
-
-        // Decrement stock for each item
-        for (const item of cart) {
-            await pool.query(
-                'UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2',
-                [item.qty, item.id]
-            ).catch(() => {});
-        }
-
-        // Increment discount usage count
-        if (discountCodeStr) {
-            await pool.query('UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)', [discountCodeStr]).catch(() => {});
-        }
-        res.json({ order: r.rows[0] });
+        res.status(404).json({ error: 'Order not found for this session. Contact support.' });
     } catch (err) {
         console.error('Checkout complete error:', err.message);
-        res.status(500).json({ error: 'Could not create order' });
+        res.status(500).json({ error: 'Could not confirm order' });
     }
 });
 

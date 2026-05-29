@@ -476,6 +476,9 @@
                 <div class="settings-tabs">
                     <button class="settings-tab active" data-tab="general" onclick="showSettingsTab('general')">General</button>
                     <button class="settings-tab" data-tab="shipping" onclick="showSettingsTab('shipping')">Shipping & Tax</button>
+                    <button class="settings-tab" data-tab="orders" onclick="showSettingsTab('orders')">Orders</button>
+                    <button class="settings-tab" data-tab="payment" onclick="showSettingsTab('payment')">Payment</button>
+                    <button class="settings-tab" data-tab="notifications" onclick="showSettingsTab('notifications')">Notifications</button>
                     <button class="settings-tab" data-tab="branding" onclick="showSettingsTab('branding')">Hero</button>
                     <button class="settings-tab" data-tab="content" onclick="showSettingsTab('content')">Content</button>
                     <button class="settings-tab" data-tab="socials" onclick="showSettingsTab('socials')">Social Links</button>
@@ -611,6 +614,146 @@
                             <span class="font-mono text-xs text-muted">What currency your prices are shown in</span>
                         </div>
                         <button class="btn btn-primary" onclick="saveBulkSettings(['order_prefix','min_order_amount','currency'])">SAVE</button>
+                    </div>
+                </div>
+
+                <!-- ORDERS TAB -->
+                <div class="settings-panel" id="stab-orders" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">ORDER <span class="text-red">CONFIRMATION</span></h3>
+                        <p class="settings-card-desc">The message customers see after they successfully place an order.</p>
+                        <div class="mb-4">
+                            <label class="input-label">CONFIRMATION MESSAGE</label>
+                            <textarea class="input-field" id="set-order_confirmation_message" style="min-height:80px;">Thank you for your order! We'll start processing it right away.</textarea>
+                            <span class="font-mono text-xs text-muted">Shown on the order success screen after checkout</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_confirmation_message'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">PROCESSING <span class="text-red">TIMES</span></h3>
+                        <p class="settings-card-desc">How long it takes to pack and ship orders. These show up on product and policy pages.</p>
+                        <div class="grid-2 mb-4">
+                            <div>
+                                <label class="input-label">PROCESSING TIME</label>
+                                <input type="text" class="input-field" id="set-order_processing_days" value="1-3">
+                                <span class="font-mono text-xs text-muted">Example: "1-3" means 1–3 business days to pack</span>
+                            </div>
+                            <div>
+                                <label class="input-label">SHIPPING TIME</label>
+                                <input type="text" class="input-field" id="set-order_shipping_days" value="5-7">
+                                <span class="font-mono text-xs text-muted">Example: "5-7" means 5–7 days in transit</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_processing_days','order_shipping_days'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">STOCK <span class="text-red">BEHAVIOR</span></h3>
+                        <p class="settings-card-desc">Control how your store handles stock and sold-out products.</p>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-show_out_of_stock_products" style="accent-color:var(--primary);width:20px;height:20px;">
+                                <span class="font-mono text-xs">SHOW SOLD-OUT PRODUCTS</span>
+                            </label>
+                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">When on, sold-out products still appear in the shop (grayed out). When off, they're hidden.</span>
+                        </div>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-auto_reduce_stock" style="accent-color:var(--primary);width:20px;height:20px;" checked>
+                                <span class="font-mono text-xs">AUTO-REDUCE STOCK ON ORDER</span>
+                            </label>
+                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">When on, stock automatically decreases when an order is placed. Recommended to keep this on.</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['show_out_of_stock_products','auto_reduce_stock'])">SAVE</button>
+                    </div>
+                </div>
+
+                <!-- PAYMENT TAB -->
+                <div class="settings-panel" id="stab-payment" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">STRIPE <span class="text-red">PAYMENT</span></h3>
+                        <p class="settings-card-desc">Stripe processes card payments securely. Connect your Stripe account to start accepting payments.</p>
+                        <div id="stripe-status-box" style="padding:14px 18px;border-radius:8px;margin-bottom:20px;border:1px solid;font-family:var(--font-mono);font-size:12px;">
+                            Checking Stripe status...
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">HOW TO CONNECT STRIPE</label>
+                            <ol style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);padding-left:20px;line-height:2;">
+                                <li>Go to <a href="https://stripe.com" target="_blank" style="color:var(--primary);">stripe.com</a> and create a free account</li>
+                                <li>In your Stripe dashboard, go to <strong style="color:var(--text);">Developers → API Keys</strong></li>
+                                <li>Copy your <strong style="color:var(--text);">Secret Key</strong> (starts with <code style="color:#f59e0b;">sk_</code>)</li>
+                                <li>Set it as the <code style="color:#f59e0b;">STRIPE_SECRET_KEY</code> environment variable in Replit Secrets</li>
+                                <li>Also set <code style="color:#f59e0b;">STRIPE_PUBLISHABLE_KEY</code> with your Publishable Key (starts with <code style="color:#f59e0b;">pk_</code>)</li>
+                            </ol>
+                        </div>
+                        <div class="mb-4" style="padding:14px;border:1px solid rgba(245,158,11,0.3);border-radius:8px;background:rgba(245,158,11,0.05);">
+                            <span class="font-mono text-xs" style="color:#f59e0b;">USE TEST KEYS FIRST</span>
+                            <p class="font-mono text-xs text-muted" style="margin-top:6px;">Use test keys (start with <code>sk_test_</code>) while building your store — no real charges. Switch to live keys when you're ready to go live.</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="checkStripeStatus()">CHECK STATUS</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">CHECKOUT <span class="text-red">FALLBACK</span></h3>
+                        <p class="settings-card-desc">If Stripe is not connected, the store automatically uses a direct checkout that creates orders without requiring payment. Use this for testing or manual/invoice-based orders.</p>
+                        <div style="padding:14px;border:1px solid rgba(34,197,94,0.3);border-radius:8px;background:rgba(34,197,94,0.05);">
+                            <span class="font-mono text-xs" style="color:#22c55e;">ALWAYS ON</span>
+                            <p class="font-mono text-xs text-muted" style="margin-top:6px;">Direct checkout is always available as a fallback. When Stripe is connected, it's used first. If Stripe fails or isn't set up, orders still go through.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NOTIFICATIONS TAB -->
+                <div class="settings-panel" id="stab-notifications" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">ADMIN <span class="text-red">ALERTS</span></h3>
+                        <p class="settings-card-desc">Get notified when something important happens in your store. Note: email delivery requires an email service — these settings control preferences for when email is set up.</p>
+                        <div class="mb-4">
+                            <label class="input-label">YOUR EMAIL FOR NOTIFICATIONS</label>
+                            <input type="email" class="input-field" id="set-admin_notification_email" placeholder="you@example.com">
+                            <span class="font-mono text-xs text-muted">Where store notifications will be sent to you (the admin)</span>
+                        </div>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-order_notification_enabled" style="accent-color:var(--primary);width:20px;height:20px;">
+                                <span class="font-mono text-xs">NEW ORDER NOTIFICATIONS</span>
+                            </label>
+                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">When on, you'll be notified every time a customer places a new order</span>
+                        </div>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-low_stock_alert_enabled" style="accent-color:var(--primary);width:20px;height:20px;" checked>
+                                <span class="font-mono text-xs">LOW STOCK ALERTS</span>
+                            </label>
+                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">Get notified when a product's stock drops to the low-stock warning level (set in Advanced)</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['admin_notification_email','order_notification_enabled','low_stock_alert_enabled'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">CUSTOMER <span class="text-red">EMAILS</span></h3>
+                        <p class="settings-card-desc">Emails sent to customers automatically.</p>
+                        <div style="padding:14px;border:1px solid rgba(99,102,241,0.3);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <div>
+                                    <div class="font-mono text-xs" style="font-weight:600;">ORDER CONFIRMATION</div>
+                                    <div class="font-mono text-xs text-muted">Sent to customer right after they place an order</div>
+                                </div>
+                                <span class="badge badge-active">AUTO</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <div>
+                                    <div class="font-mono text-xs" style="font-weight:600;">SHIPPING UPDATE</div>
+                                    <div class="font-mono text-xs text-muted">Sent when you add a tracking number to an order</div>
+                                </div>
+                                <span class="badge badge-active">AUTO</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div class="font-mono text-xs" style="font-weight:600;">ACCOUNT WELCOME</div>
+                                    <div class="font-mono text-xs text-muted">Sent when a new customer creates an account</div>
+                                </div>
+                                <span class="badge badge-active">AUTO</span>
+                            </div>
+                        </div>
+                        <p class="font-mono text-xs text-muted" style="margin-top:10px;">Email delivery requires a transactional email service (e.g. SendGrid, Mailgun). Contact support to set this up.</p>
                     </div>
                 </div>
 
@@ -1078,8 +1221,24 @@
         }
 
         function populateBulkSettings() {
-            const textFields = ['store_name','store_tagline','store_description','footer_tagline','contact_email','contact_phone','contact_address','business_hours','currency','order_prefix','min_order_amount','free_shipping_threshold','tax_rate','hero_title','hero_subtitle','hero_cta_text','checkout_terms_text','maintenance_message','low_stock_threshold','banner_text','banner_link','banner_color','seo_title','seo_description','seo_keywords','seo_og_image','policy_returns','policy_shipping','policy_privacy'];
-            const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode','banner_enabled'];
+            const textFields = [
+                'store_name','store_tagline','store_description','footer_tagline',
+                'contact_email','contact_phone','contact_address','business_hours',
+                'currency','order_prefix','min_order_amount','free_shipping_threshold',
+                'tax_rate','hero_title','hero_subtitle','hero_cta_text',
+                'checkout_terms_text','maintenance_message','low_stock_threshold',
+                'banner_text','banner_link','banner_color',
+                'seo_title','seo_description','seo_keywords','seo_og_image',
+                'policy_returns','policy_shipping','policy_privacy',
+                'admin_notification_email','order_confirmation_message',
+                'order_processing_days','order_shipping_days'
+            ];
+            const checkFields = [
+                'tax_enabled','checkout_terms_enabled','guest_checkout_enabled',
+                'maintenance_mode','banner_enabled',
+                'order_notification_enabled','low_stock_alert_enabled',
+                'show_out_of_stock_products','auto_reduce_stock'
+            ];
             for (const key of textFields) {
                 const el = document.getElementById('set-' + key);
                 if (el && allSiteSettings[key] !== undefined) {
@@ -1091,6 +1250,35 @@
                 if (el) {
                     el.checked = allSiteSettings[key] === 'true' || allSiteSettings[key] === true;
                 }
+            }
+        }
+
+        async function checkStripeStatus() {
+            const box = document.getElementById('stripe-status-box');
+            box.textContent = 'Checking...';
+            box.style.borderColor = 'var(--border)';
+            box.style.background = 'transparent';
+            box.style.color = 'var(--text-muted)';
+            try {
+                const res = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cart: [], shipping: {} })
+                });
+                const data = await res.json();
+                if (data.error === 'Stripe is not configured') {
+                    box.innerHTML = '<span style="color:#ef4444;font-weight:700;">NOT CONNECTED</span> — Add your STRIPE_SECRET_KEY in Replit Secrets to enable card payments.';
+                    box.style.borderColor = 'rgba(239,68,68,0.4)';
+                    box.style.background = 'rgba(239,68,68,0.05)';
+                } else {
+                    box.innerHTML = '<span style="color:#22c55e;font-weight:700;">CONNECTED</span> — Stripe is configured and ready to accept payments.';
+                    box.style.borderColor = 'rgba(34,197,94,0.4)';
+                    box.style.background = 'rgba(34,197,94,0.05)';
+                }
+            } catch {
+                box.innerHTML = '<span style="color:#f59e0b;font-weight:700;">UNKNOWN</span> — Could not reach the server to check status.';
+                box.style.borderColor = 'rgba(245,158,11,0.4)';
+                box.style.background = 'rgba(245,158,11,0.05)';
             }
         }
 
