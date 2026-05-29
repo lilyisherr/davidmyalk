@@ -349,7 +349,20 @@
                     </button>
                 </div>
 
-                <div id="overview-bottom-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                <!-- Revenue Chart -->
+                <div class="section-card" style="margin-bottom:24px;">
+                    <div class="section-card-header">
+                        <div class="section-card-title">Revenue <span>Overview</span></div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-sm filter-tab active" data-chart-days="7" onclick="setChartPeriod(7,this)">7D</button>
+                            <button class="btn btn-sm filter-tab" data-chart-days="30" onclick="setChartPeriod(30,this)">30D</button>
+                            <button class="btn btn-sm filter-tab" data-chart-days="90" onclick="setChartPeriod(90,this)">90D</button>
+                        </div>
+                    </div>
+                    <canvas id="revenue-chart" style="width:100%;height:180px;display:block;"></canvas>
+                </div>
+
+                <div id="overview-bottom-grid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px;">
                     <div class="section-card">
                         <div class="section-card-header">
                             <div class="section-card-title">Recent <span>Orders</span></div>
@@ -363,6 +376,12 @@
                             <button class="btn btn-secondary btn-sm" onclick="showSection('products')">VIEW ALL</button>
                         </div>
                         <div id="low-stock-list"></div>
+                    </div>
+                    <div class="section-card">
+                        <div class="section-card-header">
+                            <div class="section-card-title">Top <span>Products</span></div>
+                        </div>
+                        <div id="top-products-list"></div>
                     </div>
                 </div>
             </div>
@@ -538,11 +557,15 @@
                         <div class="settings-nav-group">
                             <span class="settings-nav-label">Marketing</span>
                             <button class="settings-nav-btn" data-tab="seo" onclick="showSettingsTab('seo')">SEO</button>
+                            <button class="settings-nav-btn" data-tab="analytics" onclick="showSettingsTab('analytics')">Analytics</button>
                             <button class="settings-nav-btn" data-tab="notifications" onclick="showSettingsTab('notifications')">Notifications</button>
+                            <button class="settings-nav-btn" data-tab="storefront" onclick="showSettingsTab('storefront')">Storefront Sections</button>
                         </div>
                         <div class="settings-nav-group">
                             <span class="settings-nav-label">Advanced</span>
                             <button class="settings-nav-btn" data-tab="policies" onclick="showSettingsTab('policies')">Policies</button>
+                            <button class="settings-nav-btn" data-tab="customcode" onclick="showSettingsTab('customcode')">Custom Code</button>
+                            <button class="settings-nav-btn" data-tab="webhooks" onclick="showSettingsTab('webhooks')">Webhooks</button>
                             <button class="settings-nav-btn" data-tab="advanced" onclick="showSettingsTab('advanced')">Advanced</button>
                         </div>
                     </div>
@@ -731,23 +754,23 @@
                 <div class="settings-panel" id="stab-payment" style="display:none;">
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">STRIPE <span class="text-red">PAYMENT</span></h3>
-                        <p class="settings-card-desc">Stripe processes card payments securely. Connect your Stripe account to start accepting payments.</p>
-                        <div id="stripe-status-box" style="padding:14px 18px;border-radius:8px;margin-bottom:20px;border:1px solid;font-family:var(--font-mono);font-size:12px;">
+                        <p class="settings-card-desc">Stripe processes card payments securely. Connect your live Stripe account to start accepting real payments.</p>
+                        <div id="stripe-status-box" style="padding:14px 18px;margin-bottom:20px;border:1px solid;font-family:var(--font-mono);font-size:12px;">
                             Checking Stripe status...
                         </div>
                         <div class="mb-4">
                             <label class="input-label">HOW TO CONNECT STRIPE</label>
                             <ol style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);padding-left:20px;line-height:2;">
-                                <li>Go to <a href="https://stripe.com" target="_blank" style="color:var(--primary);">stripe.com</a> and create a free account</li>
-                                <li>In your Stripe dashboard, go to <strong style="color:var(--text);">Developers → API Keys</strong></li>
-                                <li>Copy your <strong style="color:var(--text);">Secret Key</strong> (starts with <code style="color:#f59e0b;">sk_</code>)</li>
-                                <li>Set it as the <code style="color:#f59e0b;">STRIPE_SECRET_KEY</code> environment variable in Replit Secrets</li>
-                                <li>Also set <code style="color:#f59e0b;">STRIPE_PUBLISHABLE_KEY</code> with your Publishable Key (starts with <code style="color:#f59e0b;">pk_</code>)</li>
+                                <li>Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" style="color:var(--primary);">dashboard.stripe.com/apikeys</a></li>
+                                <li>Make sure you are in <strong style="color:#22c55e;">Live mode</strong> (toggle top-left of Stripe dashboard)</li>
+                                <li>Copy your <strong style="color:var(--text);">Secret key</strong> (starts with <code style="color:#22c55e;">sk_live_</code>)</li>
+                                <li>In Replit, open the <strong style="color:var(--text);">Secrets</strong> panel and set <code style="color:#22c55e;">STRIPE_SECRET_KEY</code> to that value</li>
+                                <li>Restart the app — Stripe will be live immediately</li>
                             </ol>
                         </div>
-                        <div class="mb-4" style="padding:14px;border:1px solid rgba(245,158,11,0.3);border-radius:8px;background:rgba(245,158,11,0.05);">
-                            <span class="font-mono text-xs" style="color:#f59e0b;">USE TEST KEYS FIRST</span>
-                            <p class="font-mono text-xs text-muted" style="margin-top:6px;">Use test keys (start with <code>sk_test_</code>) while building your store — no real charges. Switch to live keys when you're ready to go live.</p>
+                        <div class="mb-4" style="padding:14px;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.05);">
+                            <span class="font-mono text-xs" style="color:#22c55e;">LIVE PAYMENTS</span>
+                            <p class="font-mono text-xs text-muted" style="margin-top:6px;">Your store is ready for real payments. Use your <code>sk_live_</code> key — customers will be charged real money. Make sure your Stripe account is fully verified before going live.</p>
                         </div>
                         <button class="btn btn-secondary" onclick="checkStripeStatus()">CHECK STATUS</button>
                     </div>
@@ -995,6 +1018,136 @@
                     </div>
                 </div>
 
+                <!-- ANALYTICS TAB -->
+                <div class="settings-panel" id="stab-analytics" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">GOOGLE <span class="text-red">ANALYTICS</span></h3>
+                        <p class="settings-card-desc">Track traffic, conversions, and customer behavior with Google Analytics 4.</p>
+                        <div class="mb-4">
+                            <label class="input-label">MEASUREMENT ID</label>
+                            <input type="text" class="input-field" id="set-google_analytics_id" placeholder="G-XXXXXXXXXX">
+                            <span class="font-mono text-xs text-muted">Find this in your Google Analytics property settings. Starts with <code>G-</code></span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['google_analytics_id'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">FACEBOOK / META <span class="text-red">PIXEL</span></h3>
+                        <p class="settings-card-desc">Track conversions from Facebook and Instagram ads. Used for retargeting campaigns.</p>
+                        <div class="mb-4">
+                            <label class="input-label">PIXEL ID</label>
+                            <input type="text" class="input-field" id="set-fb_pixel_id" placeholder="123456789012345">
+                            <span class="font-mono text-xs text-muted">Find your Pixel ID in Meta Events Manager</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['fb_pixel_id'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">TIKTOK <span class="text-red">PIXEL</span></h3>
+                        <p class="settings-card-desc">Track conversions from TikTok ads and optimize your campaigns.</p>
+                        <div class="mb-4">
+                            <label class="input-label">PIXEL ID</label>
+                            <input type="text" class="input-field" id="set-tiktok_pixel_id" placeholder="CXXXXXXXXXXXXXXXXXX">
+                            <span class="font-mono text-xs text-muted">Find your Pixel ID in TikTok Ads Manager → Assets → Events</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['tiktok_pixel_id'])">SAVE</button>
+                    </div>
+                </div>
+
+                <!-- STOREFRONT SECTIONS TAB -->
+                <div class="settings-panel" id="stab-storefront" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">FEATURED <span class="text-red">COLLECTION</span></h3>
+                        <p class="settings-card-desc">The highlighted products section on your homepage.</p>
+                        <div class="mb-4">
+                            <label class="input-label">SECTION TITLE</label>
+                            <input type="text" class="input-field" id="set-featured_collection_title" placeholder="FEATURED DROP">
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">SECTION SUBTITLE</label>
+                            <input type="text" class="input-field" id="set-featured_collection_subtitle" placeholder="Limited edition pieces, built for the culture.">
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['featured_collection_title','featured_collection_subtitle'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">ABOUT <span class="text-red">SECTION</span></h3>
+                        <p class="settings-card-desc">The "about us" / brand story section on the homepage.</p>
+                        <div class="mb-4">
+                            <label class="input-label">SECTION TITLE</label>
+                            <input type="text" class="input-field" id="set-about_title" placeholder="BORN FROM THE SMOKE">
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">BODY TEXT</label>
+                            <textarea class="input-field" id="set-about_text" style="min-height:100px;"></textarea>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">IMAGE URL</label>
+                            <input type="text" class="input-field" id="set-about_image" placeholder="https://...">
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['about_title','about_text','about_image'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">NEWSLETTER <span class="text-red">SECTION</span></h3>
+                        <p class="settings-card-desc">Email signup section shown on the homepage.</p>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-newsletter_enabled" style="accent-color:var(--primary);width:20px;height:20px;">
+                                <span class="font-mono text-xs">SHOW NEWSLETTER SECTION</span>
+                            </label>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">TITLE</label>
+                            <input type="text" class="input-field" id="set-newsletter_title" placeholder="JOIN THE CULTURE">
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">SUBTITLE</label>
+                            <textarea class="input-field" id="set-newsletter_subtitle" style="min-height:60px;"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['newsletter_enabled','newsletter_title','newsletter_subtitle'])">SAVE</button>
+                    </div>
+                </div>
+
+                <!-- CUSTOM CODE TAB -->
+                <div class="settings-panel" id="stab-customcode" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">CUSTOM <span class="text-red">HEADER CODE</span></h3>
+                        <p class="settings-card-desc">HTML/JS injected inside the <code>&lt;head&gt;</code> on every page. Use for third-party scripts, custom fonts, or meta tags not covered above.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-custom_header_code" style="min-height:140px;font-family:var(--font-mono);font-size:12px;" placeholder="<!-- Paste your script tags or meta tags here -->"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['custom_header_code'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">CUSTOM <span class="text-red">FOOTER CODE</span></h3>
+                        <p class="settings-card-desc">HTML/JS injected just before <code>&lt;/body&gt;</code> on every page. Good for chat widgets, tracking scripts that need to load last, etc.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-custom_footer_code" style="min-height:140px;font-family:var(--font-mono);font-size:12px;" placeholder="<!-- Paste your script tags here -->"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['custom_footer_code'])">SAVE</button>
+                    </div>
+                </div>
+
+                <!-- WEBHOOKS TAB -->
+                <div class="settings-panel" id="stab-webhooks" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">ORDER <span class="text-red">WEBHOOK</span></h3>
+                        <p class="settings-card-desc">Send an HTTP POST request to your endpoint every time a new order is placed. Useful for connecting Zapier, Make, or custom automations.</p>
+                        <div class="mb-4">
+                            <label class="input-label">WEBHOOK URL</label>
+                            <input type="url" class="input-field" id="set-order_webhook_url" placeholder="https://hooks.zapier.com/...">
+                            <span class="font-mono text-xs text-muted">Leave blank to disable. Must be a full HTTPS URL.</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">WEBHOOK SECRET (optional)</label>
+                            <input type="text" class="input-field" id="set-webhook_secret" placeholder="A secret string to verify requests">
+                            <span class="font-mono text-xs text-muted">If set, this is sent as <code>X-Webhook-Secret</code> in the request header so you can verify it's from your store.</span>
+                        </div>
+                        <div style="padding:12px 16px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);margin-bottom:16px;">
+                            <span class="font-mono text-xs" style="color:#60a5fa;">PAYLOAD FORMAT</span>
+                            <pre class="font-mono text-xs text-muted" style="margin-top:6px;line-height:1.6;overflow-x:auto;">{"event":"order.created","order":{"id":1,"order_number":"DM-XXX","total":"99.99","status":"pending","customer":{...},"items":[...]}}</pre>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_webhook_url','webhook_secret'])">SAVE</button>
+                    </div>
+                </div>
+
                 <!-- POLICIES TAB -->
                 <div class="settings-panel" id="stab-policies" style="display:none;">
                     <div class="card" style="max-width:700px;">
@@ -1211,7 +1364,7 @@
         }
 
         async function loadAll() {
-            await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts()]);
+            await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts(), loadRevenueChart(7), loadTopProducts()]);
         }
 
         let allLogs = [];
@@ -1334,7 +1487,16 @@
                 'seo_title','seo_description','seo_keywords','seo_og_image',
                 'policy_returns','policy_shipping','policy_privacy',
                 'admin_notification_email','order_confirmation_message',
-                'order_processing_days','order_shipping_days'
+                'order_processing_days','order_shipping_days',
+                // Analytics
+                'google_analytics_id','fb_pixel_id','tiktok_pixel_id',
+                'custom_header_code','custom_footer_code',
+                // Webhooks
+                'order_webhook_url','webhook_secret',
+                // Storefront sections
+                'featured_collection_title','featured_collection_subtitle',
+                'newsletter_title','newsletter_subtitle',
+                'about_title','about_text','about_image'
             ];
             const checkFields = [
                 'tax_enabled','checkout_terms_enabled','guest_checkout_enabled',
@@ -1364,23 +1526,27 @@
             box.style.background = 'transparent';
             box.style.color = 'var(--text-muted)';
             try {
-                const res = await fetch('/api/checkout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart: [], shipping: {} })
-                });
+                const res = await fetch('/api/admin/stripe-status');
                 const data = await res.json();
-                if (data.error === 'Stripe is not configured') {
-                    box.innerHTML = '<span style="color:#ef4444;font-weight:700;">NOT CONNECTED</span> — Add your STRIPE_SECRET_KEY in Replit Secrets to enable card payments.';
+                if (!data.configured) {
+                    box.innerHTML = '<span style="color:#ef4444;font-weight:700;">NOT CONNECTED</span> — Add your <code>STRIPE_SECRET_KEY</code> in Replit Secrets to enable card payments.';
                     box.style.borderColor = 'rgba(239,68,68,0.4)';
                     box.style.background = 'rgba(239,68,68,0.05)';
+                } else if (data.mode === 'live') {
+                    box.innerHTML = '<span style="color:#22c55e;font-weight:700;">LIVE</span> — Stripe is connected in <strong style="color:#22c55e;">live mode</strong>. Real payments are enabled.';
+                    box.style.borderColor = 'rgba(34,197,94,0.4)';
+                    box.style.background = 'rgba(34,197,94,0.05)';
+                } else if (data.mode === 'test') {
+                    box.innerHTML = '<span style="color:#f59e0b;font-weight:700;">TEST MODE</span> — Stripe is connected but using test keys. No real charges. Switch to a <code>sk_live_</code> key to go live.';
+                    box.style.borderColor = 'rgba(245,158,11,0.4)';
+                    box.style.background = 'rgba(245,158,11,0.05)';
                 } else {
-                    box.innerHTML = '<span style="color:#22c55e;font-weight:700;">CONNECTED</span> — Stripe is configured and ready to accept payments.';
+                    box.innerHTML = '<span style="color:#22c55e;font-weight:700;">CONNECTED</span> — Stripe is configured.';
                     box.style.borderColor = 'rgba(34,197,94,0.4)';
                     box.style.background = 'rgba(34,197,94,0.05)';
                 }
             } catch {
-                box.innerHTML = '<span style="color:#f59e0b;font-weight:700;">UNKNOWN</span> — Could not reach the server to check status.';
+                box.innerHTML = '<span style="color:#f59e0b;font-weight:700;">UNKNOWN</span> — Could not check Stripe status.';
                 box.style.borderColor = 'rgba(245,158,11,0.4)';
                 box.style.background = 'rgba(245,158,11,0.05)';
             }
@@ -1401,9 +1567,139 @@
             if (el) { el.textContent = 'Saved!'; setTimeout(() => el.textContent = '', 3000); }
         }
 
+        // ─── REVENUE CHART ──────────────────────────────────────────────────────
+        let chartDays = 7;
+        async function loadRevenueChart(days) {
+            chartDays = days;
+            const canvas = document.getElementById('revenue-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 180 * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = '180px';
+            ctx.scale(dpr, dpr);
+            const w = rect.width, h = 180;
+            ctx.clearRect(0, 0, w, h);
+            try {
+                const res = await fetch('/api/admin/stats/revenue-chart?days=' + days);
+                const data = await res.json();
+                const maxRev = Math.max(...data.map(d => d.revenue), 1);
+                const pad = { t: 10, r: 16, b: 40, l: 60 };
+                const cw = w - pad.l - pad.r;
+                const ch = h - pad.t - pad.b;
+                const step = cw / Math.max(data.length - 1, 1);
+                // Grid lines
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 4; i++) {
+                    const y = pad.t + ch - (ch * i / 4);
+                    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('$' + Math.round(maxRev * i / 4), pad.l - 8, y + 4);
+                }
+                // Gradient fill
+                const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+                grad.addColorStop(0, 'rgba(255,0,0,0.25)');
+                grad.addColorStop(1, 'rgba(255,0,0,0.0)');
+                ctx.beginPath();
+                data.forEach((d, i) => {
+                    const x = pad.l + i * step;
+                    const y = pad.t + ch - (d.revenue / maxRev) * ch;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                });
+                ctx.lineTo(pad.l + (data.length - 1) * step, pad.t + ch);
+                ctx.lineTo(pad.l, pad.t + ch);
+                ctx.closePath();
+                ctx.fillStyle = grad;
+                ctx.fill();
+                // Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 2;
+                data.forEach((d, i) => {
+                    const x = pad.l + i * step;
+                    const y = pad.t + ch - (d.revenue / maxRev) * ch;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                // X-axis labels (show every N-th label)
+                const labelEvery = days <= 7 ? 1 : days <= 30 ? 5 : 15;
+                ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                data.forEach((d, i) => {
+                    if (i % labelEvery !== 0 && i !== data.length - 1) return;
+                    const x = pad.l + i * step;
+                    const label = d.date.slice(5); // MM-DD
+                    ctx.fillText(label, x, h - 8);
+                });
+                // Dots for data points (7-day only)
+                if (days <= 7) {
+                    data.forEach((d, i) => {
+                        const x = pad.l + i * step;
+                        const y = pad.t + ch - (d.revenue / maxRev) * ch;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    });
+                }
+            } catch (e) {
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('No revenue data yet', w / 2, h / 2);
+            }
+        }
+
+        function setChartPeriod(days, btn) {
+            document.querySelectorAll('[data-chart-days]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadRevenueChart(days);
+        }
+
+        async function loadTopProducts() {
+            try {
+                const res = await fetch('/api/admin/stats/top-products');
+                const items = await res.json();
+                const el = document.getElementById('top-products-list');
+                if (!el) return;
+                if (!items.length) {
+                    el.innerHTML = '<div style="padding:20px;text-align:center;"><span class="font-mono text-xs text-muted">No orders yet</span></div>';
+                    return;
+                }
+                const maxQty = Math.max(...items.map(i => parseInt(i.total_qty)));
+                el.innerHTML = items.map(item => `
+                    <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                            <img src="${item.image || '/images/og-image.png'}" style="width:32px;height:32px;object-fit:cover;border:1px solid var(--border);" onerror="this.src='/images/og-image.png'">
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</div>
+                                <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">${item.total_qty} sold · $${parseFloat(item.total_revenue).toFixed(2)}</div>
+                            </div>
+                        </div>
+                        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;background:var(--red);width:${Math.round((parseInt(item.total_qty)/maxQty)*100)}%;border-radius:2px;"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {}
+        }
+
         async function saveBulkSettings(keys) {
             const settings = {};
-            const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode'];
+            const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode',
+                'banner_enabled','order_notification_enabled','low_stock_alert_enabled',
+                'show_out_of_stock_products','auto_reduce_stock','newsletter_enabled',
+                'auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers'];
             for (const key of keys) {
                 const el = document.getElementById('set-' + key);
                 if (!el) continue;

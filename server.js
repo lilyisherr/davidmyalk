@@ -206,6 +206,24 @@ async function initDb() {
         ['auto_reduce_stock', 'true'],
         ['order_processing_days', '1-3'],
         ['order_shipping_days', '5-7'],
+        // Analytics
+        ['google_analytics_id', ''],
+        ['fb_pixel_id', ''],
+        ['tiktok_pixel_id', ''],
+        ['custom_header_code', ''],
+        ['custom_footer_code', ''],
+        // Webhooks
+        ['order_webhook_url', ''],
+        ['webhook_secret', ''],
+        // Store extras
+        ['featured_collection_title', 'FEATURED DROP'],
+        ['featured_collection_subtitle', 'Limited edition pieces, built for the culture.'],
+        ['newsletter_enabled', 'true'],
+        ['newsletter_title', 'JOIN THE CULTURE'],
+        ['newsletter_subtitle', 'Drop your email for exclusive releases, behind-the-scenes, and members-only discounts.'],
+        ['about_title', 'BORN FROM THE SMOKE'],
+        ['about_text', 'David Myalik is more than a brand — it\'s a culture. Built by drivers, for drivers. Every piece is designed for those who push limits and live for the drift.'],
+        ['about_image', 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800'],
     ];
     for (const [key, value] of defaults) {
         await pool.query(
@@ -214,18 +232,22 @@ async function initDb() {
         );
     }
 
-    // Seed sample products if none exist
-    const prodCount = await pool.query('SELECT COUNT(*) FROM products');
-    if (parseInt(prodCount.rows[0].count) === 0) {
-        await pool.query(`
-            INSERT INTO products (name, description, price, image_url, category, stock) VALUES
-            ('Sideways Always Tee', 'Premium cotton tee for drift culture enthusiasts.', 34.99, 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', 'Apparel', 50),
-            ('DM Logo Hoodie', 'Heavyweight pullover hoodie with embroidered logo.', 74.99, 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=600', 'Apparel', 25),
-            ('Smoke & Tire Cap', 'Structured snapback with embroidered drift logo.', 34.99, 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=600', 'Accessories', 40),
-            ('S13 Blueprint Poster', 'High-quality print of the iconic drift machine.', 24.99, 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=600', 'Art', 100),
-            ('Drift Culture Sticker Pack', '5-piece vinyl sticker set for your ride or gear.', 9.99, 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600', 'Accessories', 200),
-            ('Sideways Always Long Sleeve', 'Long sleeve tee with full back print.', 44.99, 'https://images.unsplash.com/photo-1618517048710-4e3dab9a7b97?w=600', 'Apparel', 3)
-        `);
+    // Seed sample products only on first-ever run (flag prevents re-seeding after deletions)
+    const seededFlag = await pool.query("SELECT value FROM settings WHERE key = 'products_seeded'");
+    if (!seededFlag.rows.length || seededFlag.rows[0].value !== 'true') {
+        const prodCount = await pool.query('SELECT COUNT(*) FROM products');
+        if (parseInt(prodCount.rows[0].count) === 0) {
+            await pool.query(`
+                INSERT INTO products (name, description, price, image_url, category, stock) VALUES
+                ('Sideways Always Tee', 'Premium cotton tee for drift culture enthusiasts.', 34.99, 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', 'Apparel', 50),
+                ('DM Logo Hoodie', 'Heavyweight pullover hoodie with embroidered logo.', 74.99, 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=600', 'Apparel', 25),
+                ('Smoke & Tire Cap', 'Structured snapback with embroidered drift logo.', 34.99, 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=600', 'Accessories', 40),
+                ('S13 Blueprint Poster', 'High-quality print of the iconic drift machine.', 24.99, 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=600', 'Art', 100),
+                ('Drift Culture Sticker Pack', '5-piece vinyl sticker set for your ride or gear.', 9.99, 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600', 'Accessories', 200),
+                ('Sideways Always Long Sleeve', 'Long sleeve tee with full back print.', 44.99, 'https://images.unsplash.com/photo-1618517048710-4e3dab9a7b97?w=600', 'Apparel', 3)
+            `);
+        }
+        await pool.query("INSERT INTO settings (key, value) VALUES ('products_seeded', 'true') ON CONFLICT (key) DO UPDATE SET value='true'");
     }
     console.log('DB ready');
 }
@@ -1226,6 +1248,73 @@ app.delete('/api/admin/discounts/:id', requireAdmin, async (req, res) => {
         await adminLog(req, 'delete_discount', `Deleted discount code: ${r.rows[0].code}`);
         res.json({ ok: true });
     } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ─── ADMIN: REVENUE CHART ────────────────────────────────────────────────────
+app.get('/api/admin/stats/revenue-chart', requireAdmin, async (req, res) => {
+    const days = Math.min(parseInt(req.query.days) || 30, 365);
+    try {
+        const r = await pool.query(`
+            SELECT
+                DATE(created_at AT TIME ZONE 'UTC') AS day,
+                COALESCE(SUM(total), 0)::float AS revenue,
+                COUNT(*)::int AS orders
+            FROM orders
+            WHERE status != 'cancelled'
+              AND created_at >= NOW() - INTERVAL '${days} days'
+            GROUP BY day
+            ORDER BY day ASC
+        `);
+        const map = {};
+        r.rows.forEach(row => { map[row.day.toISOString().slice(0,10)] = { revenue: parseFloat(row.revenue), orders: row.orders }; });
+        const result = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const key = d.toISOString().slice(0,10);
+            result.push({ date: key, revenue: map[key]?.revenue || 0, orders: map[key]?.orders || 0 });
+        }
+        res.json(result);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ─── ADMIN: TOP PRODUCTS ──────────────────────────────────────────────────────
+app.get('/api/admin/stats/top-products', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query(`
+            SELECT
+                item->>'id' AS product_id,
+                item->>'product_name' AS name,
+                item->>'product_image' AS image,
+                SUM((item->>'quantity')::int) AS total_qty,
+                SUM((item->>'quantity')::int * (item->>'price_at_purchase')::float) AS total_revenue
+            FROM orders, jsonb_array_elements(items) AS item
+            WHERE status != 'cancelled' AND item->>'id' IS NOT NULL
+            GROUP BY item->>'id', item->>'product_name', item->>'product_image'
+            ORDER BY total_qty DESC
+            LIMIT 5
+        `);
+        res.json(r.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ─── ADMIN: STRIPE STATUS ────────────────────────────────────────────────────
+app.get('/api/admin/stripe-status', requireAdmin, async (req, res) => {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) return res.json({ configured: false, mode: null });
+    const mode = key.startsWith('sk_live_') ? 'live' : key.startsWith('sk_test_') ? 'test' : 'unknown';
+    try {
+        const stripe = require('stripe')(key);
+        await stripe.balance.retrieve();
+        res.json({ configured: true, mode });
+    } catch (err) {
+        res.json({ configured: false, mode, error: err.message });
+    }
 });
 
 // ─── ADMIN: LOGS ─────────────────────────────────────────────────────────────
