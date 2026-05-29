@@ -27,6 +27,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/styles.css">
     <style>
+        #site-banner { display:none; width:100%; text-align:center; padding:10px 40px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; position:relative; z-index:200; cursor:default; }
+        #site-banner.color-red { background:var(--primary); color:#fff; }
+        #site-banner.color-dark { background:var(--card); color:var(--text); border-bottom:1px solid var(--border); }
+        #site-banner.color-white { background:#fff; color:#111; }
+        #site-banner.color-yellow { background:#f59e0b; color:#111; }
+        #site-banner a { color:inherit; text-decoration:underline; }
+        #site-banner .banner-close { position:absolute; right:14px; top:50%; transform:translateY(-50%); background:none; border:none; color:inherit; cursor:pointer; font-size:16px; opacity:0.7; line-height:1; }
+        #site-banner .banner-close:hover { opacity:1; }
         .glitch-wrapper { position: relative; display: inline-block; }
         .glitch-text { position: relative; display: inline-block; }
         .glitch-text::before, .glitch-text::after {
@@ -281,6 +289,10 @@
     </style>
 </head>
 <body>
+<div id="site-banner" role="alert">
+    <span id="banner-inner"></span>
+    <button class="banner-close" onclick="dismissBanner()" aria-label="Close banner">&#10005;</button>
+</div>
 
     <div class="gritty-overlay"></div>
     <div id="site-nav"></div>
@@ -544,6 +556,12 @@
         let activePriceRange = 'all';
         let SHIPPING_COST = 15.00;
 
+        function dismissBanner() {
+            const banner = document.getElementById('site-banner');
+            banner.style.display = 'none';
+            sessionStorage.setItem('banner-dismissed', '1');
+        }
+
         function saveCart() {
             localStorage.setItem('dm-cart', JSON.stringify(cart));
         }
@@ -587,6 +605,19 @@
                 if (siteSettings.contact_email) document.getElementById('contact-email-btn').href = 'mailto:' + siteSettings.contact_email;
                 if (siteSettings.free_shipping_threshold && parseFloat(siteSettings.free_shipping_threshold) > 0) { window.FREE_SHIPPING_THRESHOLD = parseFloat(siteSettings.free_shipping_threshold); }
                 if (siteSettings.low_stock_threshold) { window.LOW_STOCK_THRESHOLD = parseInt(siteSettings.low_stock_threshold) || 10; }
+                // Announcement banner
+                if (siteSettings.banner_enabled === 'true' && siteSettings.banner_text && !sessionStorage.getItem('banner-dismissed')) {
+                    const banner = document.getElementById('site-banner');
+                    const inner = document.getElementById('banner-inner');
+                    const color = siteSettings.banner_color || 'red';
+                    banner.className = 'color-' + color;
+                    if (siteSettings.banner_link) {
+                        inner.innerHTML = `<a href="${siteSettings.banner_link}" target="_blank" rel="noopener">${siteSettings.banner_text}</a>`;
+                    } else {
+                        inner.textContent = siteSettings.banner_text;
+                    }
+                    banner.style.display = 'block';
+                }
                 const grindData = await grindRes.json();
                 const titleParts = grindData.title.split('|');
                 if (titleParts.length === 2) {

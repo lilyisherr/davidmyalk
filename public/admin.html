@@ -414,6 +414,8 @@
                     <button class="settings-tab" data-tab="content" onclick="showSettingsTab('content')">Content</button>
                     <button class="settings-tab" data-tab="socials" onclick="showSettingsTab('socials')">Social Links</button>
                     <button class="settings-tab" data-tab="checkout" onclick="showSettingsTab('checkout')">Checkout</button>
+                    <button class="settings-tab" data-tab="seo" onclick="showSettingsTab('seo')">SEO</button>
+                    <button class="settings-tab" data-tab="policies" onclick="showSettingsTab('policies')">Policies</button>
                     <button class="settings-tab" data-tab="advanced" onclick="showSettingsTab('advanced')">Advanced</button>
                 </div>
 
@@ -652,6 +654,65 @@
                     </div>
                 </div>
 
+                <!-- SEO TAB -->
+                <div class="settings-panel" id="stab-seo" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">SEARCH ENGINE <span class="text-red">SETTINGS</span></h3>
+                        <p class="settings-card-desc">Control how your store appears in Google and when shared on social media. These settings don't change what visitors see on your site — only what search engines and social platforms show.</p>
+                        <div class="mb-4">
+                            <label class="input-label">PAGE TITLE</label>
+                            <input type="text" class="input-field" id="set-seo_title" value="">
+                            <span class="font-mono text-xs text-muted">The title that shows in Google search results and browser tabs. Keep it under 60 characters.</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">META DESCRIPTION</label>
+                            <textarea class="input-field" id="set-seo_description" style="min-height:80px;"></textarea>
+                            <span class="font-mono text-xs text-muted">The 1-2 sentence description that shows under your site name in Google results. Aim for 150-160 characters.</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">KEYWORDS</label>
+                            <input type="text" class="input-field" id="set-seo_keywords" value="">
+                            <span class="font-mono text-xs text-muted">Comma-separated words that describe your store. Example: drift culture, car apparel, motorsport clothing</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">SOCIAL SHARE IMAGE (OG IMAGE)</label>
+                            <input type="text" class="input-field" id="set-seo_og_image" placeholder="/images/og-image.png or https://...">
+                            <span class="font-mono text-xs text-muted">The image that shows when someone shares your store link on Instagram, Twitter, Discord, etc. Recommended: 1200×630px.</span>
+                            <div id="og-image-preview" style="margin-top:10px;"></div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveSeoSettings()">SAVE SEO SETTINGS</button>
+                        <div id="seo-save-status" class="font-mono text-xs text-muted" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+
+                <!-- POLICIES TAB -->
+                <div class="settings-panel" id="stab-policies" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">RETURN <span class="text-red">POLICY</span></h3>
+                        <p class="settings-card-desc">Tell customers exactly how returns and exchanges work. This text appears on your Returns page and in the help center.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-policy_returns" style="min-height:140px;"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['policy_returns'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">SHIPPING <span class="text-red">POLICY</span></h3>
+                        <p class="settings-card-desc">Explain how long orders take to ship and deliver. Appears on your Shipping Info page.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-policy_shipping" style="min-height:140px;"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['policy_shipping'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">PRIVACY <span class="text-red">POLICY</span></h3>
+                        <p class="settings-card-desc">How you handle customer data. Required for GDPR/CCPA compliance if you sell to EU or California residents.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-policy_privacy" style="min-height:140px;"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['policy_privacy'])">SAVE</button>
+                    </div>
+                </div>
+
                 <!-- ADVANCED TAB -->
                 <div class="settings-panel" id="stab-advanced" style="display:none;">
                     <div class="card" style="max-width:700px;">
@@ -680,6 +741,36 @@
                             <span class="font-mono text-xs text-muted">This message shows on the maintenance page so visitors know you'll be back</span>
                         </div>
                         <button class="btn btn-primary" onclick="saveBulkSettings(['maintenance_mode','maintenance_message'])">SAVE</button>
+                    </div>
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">ANNOUNCEMENT <span class="text-red">BANNER</span></h3>
+                        <p class="settings-card-desc">Show a slim banner at the top of every page — great for promos, free shipping announcements, or limited-time offers. Visitors can dismiss it.</p>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-banner_enabled" style="accent-color:var(--primary);width:20px;height:20px;">
+                                <span class="font-mono text-xs">SHOW BANNER ON STOREFRONT</span>
+                            </label>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">BANNER MESSAGE</label>
+                            <input type="text" class="input-field" id="set-banner_text" value="FREE SHIPPING on orders over $100 — use code SIDEWAYS">
+                            <span class="font-mono text-xs text-muted">The text shown in the banner strip</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">LINK URL (optional)</label>
+                            <input type="text" class="input-field" id="set-banner_link" placeholder="https://... or leave blank">
+                            <span class="font-mono text-xs text-muted">If set, clicking the banner goes to this URL</span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">COLOR</label>
+                            <select class="input-field" id="set-banner_color" style="max-width:200px;">
+                                <option value="red">Red</option>
+                                <option value="dark">Dark</option>
+                                <option value="white">White</option>
+                                <option value="yellow">Yellow</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['banner_enabled','banner_text','banner_link','banner_color'])">SAVE</button>
                     </div>
                     <div class="card" style="max-width:700px;margin-top:24px;border-color:rgba(239,68,68,0.3);">
                         <h3 class="settings-card-title" style="color:var(--red);">DANGER <span style="color:var(--text);">ZONE</span></h3>
@@ -899,9 +990,25 @@
             } catch(e) {}
         }
 
+        async function saveSeoSettings() {
+            const keys = ['seo_title','seo_description','seo_keywords','seo_og_image'];
+            const settings = {};
+            for (const key of keys) {
+                const el = document.getElementById('set-' + key);
+                if (el) settings[key] = el.value;
+            }
+            try {
+                const res = await fetch('/api/admin/settings/bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ settings }) });
+                if (!res.ok) throw new Error();
+                document.getElementById('seo-save-status').textContent = 'Saved!';
+                setTimeout(() => { document.getElementById('seo-save-status').textContent = ''; }, 3000);
+                showToast('SEO settings saved', 'success');
+            } catch { showToast('Failed to save SEO settings', 'error'); }
+        }
+
         function populateBulkSettings() {
-            const textFields = ['store_name','store_tagline','store_description','footer_tagline','contact_email','contact_phone','contact_address','business_hours','currency','order_prefix','min_order_amount','free_shipping_threshold','tax_rate','hero_title','hero_subtitle','hero_cta_text','checkout_terms_text','maintenance_message','low_stock_threshold'];
-            const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode'];
+            const textFields = ['store_name','store_tagline','store_description','footer_tagline','contact_email','contact_phone','contact_address','business_hours','currency','order_prefix','min_order_amount','free_shipping_threshold','tax_rate','hero_title','hero_subtitle','hero_cta_text','checkout_terms_text','maintenance_message','low_stock_threshold','banner_text','banner_link','banner_color','seo_title','seo_description','seo_keywords','seo_og_image','policy_returns','policy_shipping','policy_privacy'];
+            const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode','banner_enabled'];
             for (const key of textFields) {
                 const el = document.getElementById('set-' + key);
                 if (el && allSiteSettings[key] !== undefined) {

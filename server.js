@@ -11,7 +11,13 @@ const app = express();
 const PORT = 5000;
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Support Vercel/Neon environment variable names alongside standard DATABASE_URL
+const dbUrl = process.env.DATABASE_URL
+    || process.env.POSTGRES_URL
+    || process.env.POSTGRES_PRISMA_URL
+    || process.env.POSTGRES_URL_NON_POOLING;
+if (!dbUrl) { console.error('ERROR: No database URL found. Set DATABASE_URL, POSTGRES_URL, or POSTGRES_PRISMA_URL.'); process.exit(1); }
+const pool = new Pool({ connectionString: dbUrl });
 
 app.use(express.json());
 app.use(cookieParser());
@@ -156,6 +162,20 @@ async function initDb() {
         ['checkout_terms_enabled', 'false'],
         ['checkout_terms_text', ''],
         ['min_order_amount', '0'],
+        // SEO
+        ['seo_title', 'DAVID MYALIK | Sideways Always - Drift Culture Merch & Apparel'],
+        ['seo_description', 'Official merch store for David Myalik. Drift culture apparel, accessories, and gear for those who live life sideways. Born from the smoke, built for the streets.'],
+        ['seo_keywords', 'David Myalik, Sideways Always, drift merch, drift culture, car culture apparel, motorsport clothing'],
+        ['seo_og_image', '/images/og-image.png'],
+        // Announcement banner
+        ['banner_enabled', 'false'],
+        ['banner_text', 'FREE SHIPPING on orders over $100 — use code SIDEWAYS'],
+        ['banner_link', ''],
+        ['banner_color', 'red'],
+        // Policies
+        ['policy_returns', 'We accept returns within 30 days of purchase. Items must be unworn, unwashed, and in original condition with tags attached. Sale items are final sale. To start a return, email us with your order number.'],
+        ['policy_shipping', 'Orders ship within 1-3 business days. Standard shipping takes 5-7 business days. Expedited shipping is available at checkout. We ship worldwide — international orders may take 10-21 business days.'],
+        ['policy_privacy', 'We collect only the information needed to process your order and improve your experience. We never sell your data to third parties. Your payment information is processed securely by Stripe and never stored on our servers.'],
     ];
     for (const [key, value] of defaults) {
         await pool.query(
