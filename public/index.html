@@ -201,6 +201,8 @@
         .product-info { margin-top: 14px; }
         .product-name { font-size: 16px; letter-spacing: -0.01em; font-weight: 700; }
         .product-price { font-family: var(--font-mono); color: var(--primary); font-size: 15px; margin-top: 4px; }
+        .product-price-original { font-family: var(--font-mono); color: var(--text-muted); font-size: 12px; text-decoration: line-through; margin-left: 6px; }
+        .sale-badge { display:inline-block; background:var(--primary); color:#fff; font-family:var(--font-mono); font-size:9px; padding:2px 6px; letter-spacing:0.1em; margin-bottom:4px; }
         .product-category-tag {
             font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
             letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 4px;
@@ -381,7 +383,7 @@
                         <span>TOTAL</span>
                         <span id="checkout-total" class="text-red">$0.00</span>
                     </div>
-                    <button onclick="placeOrder()" class="btn btn-primary btn-full mt-6" id="place-order-btn" style="font-size:16px;">PAY WITH STRIPE</button>
+                    <button onclick="placeOrder()" class="btn btn-primary btn-full mt-6" id="place-order-btn" style="font-size:16px;">PLACE ORDER</button>
                     <button onclick="goToCheckoutStep(1)" class="btn btn-secondary btn-full mt-4" style="font-size:13px;">BACK TO SHIPPING</button>
                 </div>
 
@@ -806,6 +808,13 @@
                 }
                 const isOutOfStock = p.stock <= 0;
                 const catTag = p.category ? `<p class="product-category-tag">${p.category}</p>` : '';
+                const hasSale = p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price);
+                const displayPrice = hasSale ? parseFloat(p.sale_price) : parseFloat(p.price);
+                const salePct = hasSale ? Math.round((1 - parseFloat(p.sale_price) / parseFloat(p.price)) * 100) : 0;
+                const priceHTML = hasSale
+                    ? `<p class="product-price">$${displayPrice.toFixed(2)}<span class="product-price-original">$${parseFloat(p.price).toFixed(2)}</span></p>`
+                    : `<p class="product-price">$${displayPrice.toFixed(2)}</p>`;
+                const saleBadge = hasSale ? `<span class="sale-badge">SALE −${salePct}%</span>` : '';
                 return `
                 <div class="product-card reveal" style="position:relative;">
                     <div class="product-img-wrap">
@@ -816,9 +825,10 @@
                         </div>`}
                     </div>
                     <div class="product-info">
+                        ${saleBadge}
                         ${catTag}
                         <h3 class="product-name">${p.name}</h3>
-                        <p class="product-price">$${parseFloat(p.price).toFixed(2)}</p>
+                        ${priceHTML}
                         ${stockHTML}
                     </div>
                 </div>`;
@@ -848,9 +858,16 @@
             }
         }
 
+        function getEffectivePrice(product) {
+            const sp = product.sale_price !== null && product.sale_price !== undefined ? parseFloat(product.sale_price) : null;
+            const reg = parseFloat(product.price);
+            return (sp !== null && sp < reg) ? sp : reg;
+        }
+
         function addToCart(id) {
             const product = products.find(p => p.id === id);
             if (!product || product.stock <= 0) return;
+            const effectivePrice = getEffectivePrice(product);
             const existing = cart.find(i => i.id === id);
             if (existing) {
                 if (existing.qty >= product.stock) {
@@ -858,8 +875,9 @@
                     return;
                 }
                 existing.qty++;
+                existing.price = effectivePrice;
             } else {
-                cart.push({ id: product.id, name: product.name, price: parseFloat(product.price), image_url: product.image_url, qty: 1 });
+                cart.push({ id: product.id, name: product.name, price: effectivePrice, image_url: product.image_url, qty: 1 });
             }
             saveCart();
             updateCartUI();
@@ -1061,7 +1079,7 @@
         async function placeOrder() {
             const btn = document.getElementById('place-order-btn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="loading-spinner"></span> REDIRECTING TO PAYMENT...';
+            btn.innerHTML = '<span class="loading-spinner"></span> PROCESSING...';
 
             const shipping = {
                 firstName: document.getElementById('ship-fname').value,
@@ -1074,7 +1092,29 @@
             };
 
             try {
+                // Try Stripe checkout first
                 const res = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cart, shipping, discountCode: appliedDiscount?.code || '' })
+                });
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    window.location.href = data.url;
+                    return;
+                }
+                // Stripe not configured or failed — fall through to direct checkout
+                if (data.error && data.error !== 'Stripe is not configured') {
+                    showToast(data.error || 'Checkout failed', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'PLACE ORDER';
+                    return;
+                }
+            } catch (err) {}
+
+            // Direct checkout (no Stripe)
+            try {
+                const res = await fetch('/api/checkout/direct', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cart, shipping, discountCode: appliedDiscount?.code || '' })
@@ -1083,14 +1123,23 @@
                 if (!res.ok) {
                     showToast(data.error || 'Checkout failed', 'error');
                     btn.disabled = false;
-                    btn.textContent = 'PAY WITH STRIPE';
+                    btn.textContent = 'PLACE ORDER';
                     return;
                 }
-                window.location.href = data.url;
+                cart = [];
+                saveCart();
+                updateCartUI();
+                document.getElementById('confirmed-order-number').textContent = data.order.order_number;
+                document.getElementById('checkout-modal').style.display = 'flex';
+                goToCheckoutStep(3);
+                const prodRes = await fetch('/api/products');
+                products = await prodRes.json();
+                renderCategoryFilters();
+                renderProducts();
             } catch (err) {
                 showToast('Something went wrong', 'error');
                 btn.disabled = false;
-                btn.textContent = 'PAY WITH STRIPE';
+                btn.textContent = 'PLACE ORDER';
             }
         }
 

@@ -861,8 +861,13 @@
                 <div class="mb-4"><label class="input-label">NAME</label><input type="text" class="input-field" id="prod-name" required></div>
                 <div class="mb-4"><label class="input-label">DESCRIPTION</label><textarea class="input-field" id="prod-description" style="min-height:80px;"></textarea></div>
                 <div class="grid-2 mb-4">
-                    <div><label class="input-label">PRICE ($)</label><input type="number" step="0.01" class="input-field" id="prod-price" required></div>
-                    <div><label class="input-label">STOCK</label><input type="number" class="input-field" id="prod-stock" required></div>
+                    <div><label class="input-label">PRICE ($)</label><input type="number" step="0.01" min="0" class="input-field" id="prod-price" required></div>
+                    <div><label class="input-label">SALE PRICE ($) <span style="color:var(--primary);font-size:10px;">OPTIONAL</span></label><input type="number" step="0.01" min="0" class="input-field" id="prod-sale-price" placeholder="Leave blank = no sale"></div>
+                </div>
+                <div class="mb-4">
+                    <label class="input-label">STOCK</label>
+                    <input type="number" min="0" class="input-field" id="prod-stock" required>
+                    <span class="font-mono text-xs text-muted">How many units are available to purchase</span>
                 </div>
                 <div class="grid-2 mb-4">
                     <div>
@@ -1387,7 +1392,7 @@
                         </div>
                     </div></td>
                     <td><span class="badge badge-customer">${p.category || 'Uncategorized'}</span></td>
-                    <td class="font-mono">$${parseFloat(p.price).toFixed(2)}</td>
+                    <td class="font-mono">${p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price) ? `<span style="color:var(--primary);">$${parseFloat(p.sale_price).toFixed(2)}</span> <span style="text-decoration:line-through;color:var(--text-muted);font-size:11px;">$${parseFloat(p.price).toFixed(2)}</span>` : `$${parseFloat(p.price).toFixed(2)}`}</td>
                     <td class="font-mono ${stockClass}" style="cursor:pointer;" onclick="quickStockEdit(${p.id}, ${p.stock}, this)" title="Click to edit stock">${stockText}</td>
                     <td><span class="badge ${p.is_active ? 'badge-active' : 'badge-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                     <td>
@@ -1641,6 +1646,7 @@
             document.getElementById('prod-name').value = p.name;
             document.getElementById('prod-description').value = p.description || '';
             document.getElementById('prod-price').value = p.price;
+            document.getElementById('prod-sale-price').value = p.sale_price !== null && p.sale_price !== undefined ? p.sale_price : '';
             document.getElementById('prod-stock').value = p.stock;
             document.getElementById('prod-active').value = String(p.is_active);
             document.getElementById('prod-image-final').value = p.image_url || '';
@@ -1690,10 +1696,12 @@
                 imageUrl = document.getElementById('prod-image-url').value || imageUrl;
             }
 
+            const salePriceRaw = document.getElementById('prod-sale-price').value.trim();
             const payload = {
                 name: document.getElementById('prod-name').value,
                 description: document.getElementById('prod-description').value,
                 price: document.getElementById('prod-price').value,
+                salePrice: salePriceRaw !== '' ? salePriceRaw : null,
                 stock: document.getElementById('prod-stock').value,
                 category: category,
                 isActive: document.getElementById('prod-active').value === 'true',

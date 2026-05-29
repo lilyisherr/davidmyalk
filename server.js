@@ -55,6 +55,7 @@ async function initDb() {
             name VARCHAR(255) NOT NULL,
             description TEXT DEFAULT '',
             price DECIMAL(10,2) NOT NULL,
+            sale_price DECIMAL(10,2) DEFAULT NULL,
             image_url VARCHAR(500) DEFAULT '',
             category VARCHAR(100) DEFAULT '',
             stock INTEGER DEFAULT 0,
@@ -142,6 +143,7 @@ async function initDb() {
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT ''`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code VARCHAR(50) DEFAULT ''`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`);
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price DECIMAL(10,2) DEFAULT NULL`);
 
     // Seed default settings
     const defaults = [
@@ -614,8 +616,6 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
             quantity: i.qty
         }));
 
-        // Get discount info from Stripe session metadata if available
-        const discountCode = sessionId && process.env.STRIPE_SECRET_KEY ? (() => { try { return JSON.parse('""'); } catch { return ''; } })() : '';
         let discountAmount = 0;
         let discountCodeStr = '';
         if (sessionId && process.env.STRIPE_SECRET_KEY) {
@@ -641,6 +641,14 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
                 JSON.stringify(items), sessionId || '']
         );
 
+        // Decrement stock for each item
+        for (const item of cart) {
+            await pool.query(
+                'UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2',
+                [item.qty, item.id]
+            ).catch(() => {});
+        }
+
         // Increment discount usage count
         if (discountCodeStr) {
             await pool.query('UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)', [discountCodeStr]).catch(() => {});
@@ -648,6 +656,90 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
         res.json({ order: r.rows[0] });
     } catch (err) {
         console.error('Checkout complete error:', err.message);
+        res.status(500).json({ error: 'Could not create order' });
+    }
+});
+
+// ─── DIRECT CHECKOUT (no Stripe) ─────────────────────────────────────────────
+app.post('/api/checkout/direct', requireAuth, async (req, res) => {
+    try {
+        const { cart, shipping, discountCode } = req.body;
+        if (!cart || !cart.length) return res.status(400).json({ error: 'Cart is empty' });
+
+        // Validate stock and get current product prices
+        for (const item of cart) {
+            const p = await pool.query('SELECT * FROM products WHERE id = $1 AND is_active = true', [item.id]);
+            if (!p.rows.length) return res.status(400).json({ error: `Product not found: ${item.name}` });
+            if (p.rows[0].stock < item.qty) return res.status(400).json({ error: `Not enough stock for ${item.name}` });
+        }
+
+        const shippingCostRow = await pool.query("SELECT value FROM settings WHERE key = 'shipping_cost'");
+        const shippingCost = parseFloat(shippingCostRow.rows[0]?.value || '8.99');
+        const freeThresholdRow = await pool.query("SELECT value FROM settings WHERE key = 'free_shipping_threshold'");
+        const freeThreshold = parseFloat(freeThresholdRow.rows[0]?.value || '0');
+        const subtotal = cart.reduce((acc, i) => acc + parseFloat(i.price) * i.qty, 0);
+        const effectiveShipping = (freeThreshold > 0 && subtotal >= freeThreshold) ? 0 : shippingCost;
+
+        let discountAmount = 0;
+        let discountCodeStr = '';
+        if (discountCode) {
+            const dc = await pool.query(
+                `SELECT * FROM discount_codes WHERE UPPER(code) = UPPER($1) AND is_active = true
+                 AND (expires_at IS NULL OR expires_at > NOW())
+                 AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+                [discountCode]
+            );
+            if (dc.rows.length) {
+                const d = dc.rows[0];
+                discountCodeStr = d.code;
+                if (d.type === 'percentage') {
+                    discountAmount = subtotal * (parseFloat(d.value) / 100);
+                } else {
+                    discountAmount = Math.min(parseFloat(d.value), subtotal);
+                }
+                discountAmount = Math.round(discountAmount * 100) / 100;
+            }
+        }
+
+        const prefix = (await pool.query("SELECT value FROM settings WHERE key = 'order_prefix'")).rows[0]?.value || 'DM';
+        const orderNum = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+        const total = Math.max(0, subtotal + effectiveShipping - discountAmount);
+
+        const items = cart.map(i => ({
+            id: i.id,
+            product_name: i.name,
+            product_image: i.image_url || '',
+            price_at_purchase: i.price,
+            quantity: i.qty
+        }));
+
+        const r = await pool.query(
+            `INSERT INTO orders (order_number, user_id, status, subtotal, shipping_cost, total, discount_code, discount_amount,
+                shipping_first_name, shipping_last_name, shipping_address, shipping_city,
+                shipping_state, shipping_zip, shipping_country, items, stripe_session_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+            [orderNum, req.user.id, 'pending', subtotal, effectiveShipping, total, discountCodeStr, discountAmount,
+                shipping?.firstName || '', shipping?.lastName || '', shipping?.address || '',
+                shipping?.city || '', shipping?.state || '', shipping?.zip || '', shipping?.country || 'US',
+                JSON.stringify(items), '']
+        );
+
+        // Decrement stock
+        for (const item of cart) {
+            await pool.query(
+                'UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2',
+                [item.qty, item.id]
+            ).catch(() => {});
+        }
+
+        // Increment discount usage count
+        if (discountCodeStr) {
+            await pool.query('UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)', [discountCodeStr]).catch(() => {});
+        }
+
+        res.json({ order: r.rows[0] });
+    } catch (err) {
+        console.error('Direct checkout error:', err.message);
         res.status(500).json({ error: 'Could not create order' });
     }
 });
@@ -699,12 +791,13 @@ app.get('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
-    const { name, description, price, stock, category, isActive, imageUrl } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl } = req.body;
     if (!name || price === undefined) return res.status(400).json({ error: 'Name and price are required' });
     try {
+        const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
         const r = await pool.query(
-            'INSERT INTO products (name, description, price, image_url, category, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-            [name, description || '', parseFloat(price), imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false]
+            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false]
         );
         await adminLog(req, 'create_product', `Created product: ${name}`);
         res.json(r.rows[0]);
@@ -715,11 +808,12 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
-    const { name, description, price, stock, category, isActive, imageUrl } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl } = req.body;
     try {
+        const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
         const r = await pool.query(
-            'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, stock=$6, is_active=$7 WHERE id=$8 RETURNING *',
-            [name, description || '', parseFloat(price), imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, req.params.id]
+            'UPDATE products SET name=$1, description=$2, price=$3, sale_price=$4, image_url=$5, category=$6, stock=$7, is_active=$8 WHERE id=$9 RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, req.params.id]
         );
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
         await adminLog(req, 'update_product', `Updated product: ${name}`);
@@ -767,8 +861,8 @@ app.post('/api/admin/products/:id/duplicate', requireAdmin, async (req, res) => 
         if (!orig.rows.length) return res.status(404).json({ error: 'Not found' });
         const p = orig.rows[0];
         const r = await pool.query(
-            'INSERT INTO products (name, description, price, image_url, category, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-            [`${p.name} (Copy)`, p.description, p.price, p.image_url, p.category, 0, false]
+            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+            [`${p.name} (Copy)`, p.description, p.price, p.sale_price, p.image_url, p.category, 0, false]
         );
         await adminLog(req, 'duplicate_product', `Duplicated product: ${p.name}`);
         res.json(r.rows[0]);
