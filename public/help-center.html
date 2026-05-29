@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center | DAVID MYALIK - Sideways Always</title>
+    <meta name="description" content="Get answers to frequently asked questions about David Myalik orders, shipping, payments, returns, and account management.">
+    <meta name="theme-color" content="#050810">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Help Center | DAVID MYALIK">
+    <meta property="og:description" content="FAQ and support for Sideways Always merch orders, shipping, and returns.">
+    <meta property="og:image" content="/images/og-image.png">
+    <meta property="og:site_name" content="David Myalik - Sideways Always">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Help Center | DAVID MYALIK">
+    <meta name="twitter:description" content="FAQ and support for Sideways Always merch orders, shipping, and returns.">
+    <meta name="twitter:image" content="/images/og-image.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .info-page { padding-top: 65px; min-height: 100vh; background: var(--navy); }
+        .info-hero {
+            padding: 80px 16px 60px; text-align: center;
+            background: var(--navy-light); border-bottom: 1px solid var(--border);
+        }
+        .info-hero h1 { font-size: clamp(40px, 6vw, 72px); margin-bottom: 12px; }
+        .info-content { max-width: 800px; margin: 0 auto; padding: 60px 24px; }
+        .faq-item {
+            border: 1px solid var(--border); margin-bottom: 16px;
+            background: var(--navy-card); transition: border-color 0.3s;
+        }
+        .faq-item:hover { border-color: rgba(255,255,255,0.15); }
+        .faq-q {
+            padding: 20px 24px; cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center;
+            font-family: var(--font-body); font-size: 16px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.02em;
+        }
+        .faq-q svg { transition: transform 0.3s; flex-shrink: 0; margin-left: 16px; }
+        .faq-q.open svg { transform: rotate(180deg); }
+        .faq-a {
+            padding: 0 24px 20px; display: none;
+            font-family: var(--font-mono); font-size: 13px;
+            color: var(--text-muted); line-height: 1.8;
+        }
+        .faq-a.open { display: block; }
+        .contact-box {
+            background: var(--navy-light); border: 1px solid var(--border);
+            padding: 40px; text-align: center; margin-top: 48px;
+        }
+        @media (max-width: 480px) {
+            .info-content { padding: 40px 16px; }
+            .faq-q { font-size: 14px; padding: 16px; }
+            .faq-a { padding: 0 16px 16px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="site-nav"></div>
+
+    <div class="info-page">
+        <div class="info-hero">
+            <h1>HELP <span class="text-red">CENTER</span></h1>
+            <p class="font-mono text-muted" style="font-size:12px;letter-spacing:0.2em;">FREQUENTLY ASKED QUESTIONS</p>
+        </div>
+
+        <div class="info-content">
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    How do I place an order?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">Browse our shop, click "Add to Cart" on any product you want, then open your cart and click "Checkout Now." You'll need to create an account or log in to complete your purchase. Fill in your shipping details, review your order, and confirm.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    How do I track my order?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">Once your order ships, you'll receive a tracking number. Log in to your account and go to your Dashboard to view your orders and tracking information.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    What payment methods do you accept?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">We accept all major credit and debit cards through our secure checkout system powered by Stripe. This includes Visa, Mastercard, American Express, and Discover.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    Can I change or cancel my order?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">If your order hasn't shipped yet, contact us as soon as possible and we'll do our best to make changes or cancel it. Once an order has shipped, we cannot make changes but you can initiate a return once you receive it.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    How do I create an account?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">Click the "Sign Up" button in the navigation bar. Fill in your first name, last name, email, and choose a password. Once registered, you can manage your orders, save addresses, and check out faster.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    I forgot my password. What do I do?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">Go to the login page and click "Forgot your password?" Enter your email address and we'll generate a password reset token for you. Use that token to set a new password.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    Do you ship internationally?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">Yes, we ship to the United States, Canada, United Kingdom, and Australia. Shipping times and costs vary by location. Check our <a href="/shipping-info" style="color:var(--primary);">Shipping Info</a> page for details.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">
+                    What is your return policy?
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="faq-a">We accept returns within 30 days of delivery. Items must be unworn, unwashed, and in original condition with tags attached. Visit our <a href="/returns" style="color:var(--primary);">Returns</a> page for the full policy.</div>
+            </div>
+
+            <div class="contact-box">
+                <h3 style="font-size:28px;margin-bottom:12px;">STILL NEED <span class="text-red">HELP?</span></h3>
+                <p class="font-mono text-muted" style="font-size:12px;margin-bottom:24px;">We're here to help. Reach out and we'll get back to you.</p>
+                <a href="mailto:contact@davidmyalik.com" class="btn btn-primary">CONTACT US</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="site-footer"></div>
+
+    <script src="/js/components.js"></script>
+    <script>
+        (async () => {
+            const user = await checkAuth();
+            renderNav(user);
+            renderFooter();
+        })();
+
+        function toggleFaq(el) {
+            const answer = el.nextElementSibling;
+            const isOpen = el.classList.contains('open');
+            document.querySelectorAll('.faq-q').forEach(q => { q.classList.remove('open'); q.nextElementSibling.classList.remove('open'); });
+            if (!isOpen) { el.classList.add('open'); answer.classList.add('open'); }
+        }
+    </script>
+</body>
+</html>
