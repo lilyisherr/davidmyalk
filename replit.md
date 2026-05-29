@@ -7,7 +7,7 @@ A full-stack e-commerce site for drift culture apparel brand "David Myalik / Sid
 - `server.js` — Express server with all API routes, auth, and DB initialization
 - `public/` — Static frontend (HTML, CSS, JS
 - `api/checkout.js` — Legacy Netlify serverless function (not used by the Express server)
-- `package.json` — Node.js project dependencies
+- `package.json` — Node.js project dependencie
 
 ## Tech Stack
 
