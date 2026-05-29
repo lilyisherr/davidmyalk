@@ -275,18 +275,63 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
+/* ─── MOBILE BOTTOM NAV (dashboard + admin) ─────────────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 55;
+  background: rgba(10,15,26,0.98); border-top: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+}
+.mobile-bottom-nav-inner {
+  display: flex; justify-content: space-around; align-items: flex-end;
+  max-width: 500px; margin: 0 auto;
+}
+.mbn-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  padding: 6px 12px; border-radius: 8px; transition: all 0.2s; flex: 1;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em;
+  text-transform: uppercase; min-width: 0;
+}
+.mbn-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+.mbn-btn.active { color: var(--primary); }
+.mbn-btn.active svg { stroke: var(--primary); }
+.mbn-badge {
+  position: absolute; top: 4px; right: 8px;
+  background: var(--primary); color: white; font-size: 9px;
+  border-radius: 99px; padding: 1px 5px; font-family: var(--font-mono);
+}
+
 @media (max-width: 768px) {
   .sidebar { display: none; }
-  .main-content { margin-left: 0; padding: 16px; }
+  .main-content { margin-left: 0; padding: 16px 16px 80px; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .nav-links { display: none !important; }
   .mobile-menu-toggle { display: block; }
   .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
   .toast { min-width: unset; }
+  .mobile-bottom-nav { display: block; }
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  td, th { white-space: nowrap; }
 }
 
 @media (max-width: 480px) {
   .footer-top { grid-template-columns: 1fr; }
   .auth-card { padding: 32px 24px; }
   .hide-mobile { display: none; }
+  .main-content { padding: 12px 12px 80px; }
 }
+
+/* Live status pulse */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #22c55e; margin-right: 5px;
+  animation: livePulse 2s ease-in-out infinite;
+}
+.live-dot.syncing { background: #f59e0b; }

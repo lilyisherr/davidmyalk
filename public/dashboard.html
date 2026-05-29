@@ -25,6 +25,34 @@
                 </div>
                 <a href="#" class="nav-link" onclick="logout()" style="color:#ef4444;">Logout</a>
             </div>
+            <button class="mobile-menu-toggle" onclick="document.getElementById('mobile-menu').classList.add('open')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu-overlay" id="mobile-menu">
+        <button class="mobile-close-btn" onclick="document.getElementById('mobile-menu').classList.remove('open')">&#10005;</button>
+        <a href="/" style="font-family:var(--font-display);font-size:20px;letter-spacing:0.1em;">STORE</a>
+        <a href="/dashboard" style="font-family:var(--font-display);font-size:20px;letter-spacing:0.1em;color:var(--primary);">DASHBOARD</a>
+        <a href="#" onclick="logout()" style="font-family:var(--font-display);font-size:20px;letter-spacing:0.1em;color:#ef4444;">LOGOUT</a>
+    </div>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+        <div class="mobile-bottom-nav-inner">
+            <button class="mbn-btn active" id="mbn-orders" onclick="showSection('orders')">
+                <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                Orders
+            </button>
+            <button class="mbn-btn" id="mbn-settings" onclick="showSection('settings')">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </button>
+            <button class="mbn-btn" id="mbn-addresses" onclick="showSection('addresses')">
+                <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Addresses
+            </button>
         </div>
     </nav>
 
@@ -46,8 +74,11 @@
 
         <div class="main-content">
             <div id="orders-section">
-                <h2 style="font-size:36px; margin-bottom:8px;">MY <span class="text-red">ORDERS</span></h2>
-                <p class="font-mono text-muted text-xs mb-8">Track and manage your purchases</p>
+                <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                    <h2 style="font-size:36px;">MY <span class="text-red">ORDERS</span></h2>
+                    <span class="font-mono text-xs text-muted" id="orders-last-updated" style="font-size:10px;"></span>
+                </div>
+                <p class="font-mono text-muted text-xs mb-8">Track and manage your purchases — updates automatically</p>
                 <div id="orders-list"></div>
             </div>
 
@@ -164,6 +195,8 @@
 
     <script>
         let currentUser = null;
+        let ordersPollingInterval = null;
+        let lastOrdersData = null;
 
         async function init() {
             const res = await fetch('/api/auth/me');
@@ -178,6 +211,17 @@
             document.getElementById('set-phone').value = currentUser.phone || '';
             loadOrders();
             loadAddresses();
+            startOrdersPolling();
+        }
+
+        function startOrdersPolling() {
+            if (ordersPollingInterval) clearInterval(ordersPollingInterval);
+            ordersPollingInterval = setInterval(async () => {
+                const ordersSection = document.getElementById('orders-section');
+                if (ordersSection && ordersSection.style.display !== 'none') {
+                    await loadOrders(true);
+                }
+            }, 30000);
         }
 
         function showSection(name) {
@@ -185,12 +229,34 @@
                 document.getElementById(s + '-section').style.display = s === name ? 'block' : 'none';
             });
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            if (event && event.currentTarget) event.currentTarget.classList.add('active');
+            // Update mobile bottom nav
+            ['orders','settings','addresses'].forEach(s => {
+                const btn = document.getElementById('mbn-' + s);
+                if (btn) btn.classList.toggle('active', s === name);
+            });
         }
 
-        async function loadOrders() {
-            const res = await fetch('/api/orders');
-            const orders = await res.json();
+        async function loadOrders(silent = false) {
+            const dot = document.getElementById('orders-live-dot');
+            const lastUpdatedEl = document.getElementById('orders-last-updated');
+            if (dot) { dot.className = 'live-dot syncing'; }
+            try {
+                const res = await fetch('/api/orders');
+                const orders = await res.json();
+                const newJson = JSON.stringify(orders);
+                if (!silent || newJson !== lastOrdersData) {
+                    lastOrdersData = newJson;
+                    renderOrders(orders);
+                }
+                const now = new Date();
+                if (lastUpdatedEl) lastUpdatedEl.innerHTML = `<span class="live-dot" id="orders-live-dot"></span>Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+            } catch(e) {
+                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Could not refresh';
+            }
+        }
+
+        function renderOrders(orders) {
             const container = document.getElementById('orders-list');
             if (orders.length === 0) {
                 container.innerHTML = `<div class="empty-state">
@@ -200,24 +266,36 @@
                 </div>`;
                 return;
             }
-            container.innerHTML = orders.map(o => `
-                <div class="card mb-4" style="cursor:pointer;" onclick="viewOrderDetail(${o.id})">
-                    <div class="flex-between">
-                        <div>
+            container.innerHTML = orders.map(o => {
+                const statusLabel = o.status.replace('_', ' ');
+                const trackingColor = o.status === 'shipped' || o.status === 'delivered' ? '#a855f7' : '#a855f7';
+                return `
+                <div class="card mb-4" style="cursor:pointer;transition:border-color 0.2s;" onmouseenter="this.style.borderColor='rgba(255,255,255,0.18)'" onmouseleave="this.style.borderColor=''" onclick="viewOrderDetail(${o.id})">
+                    <div class="flex-between" style="gap:12px;">
+                        <div style="min-width:0;">
                             <span class="font-mono text-xs text-muted">${o.order_number}</span>
-                            <p class="font-display" style="font-size:18px; margin-top:4px;">$${parseFloat(o.total).toFixed(2)}</p>
+                            <p class="font-display" style="font-size:22px; margin-top:2px; letter-spacing:-0.02em;">$${parseFloat(o.total).toFixed(2)}</p>
                         </div>
-                        <div style="text-align:right;">
-                            <span class="badge badge-${o.status}">${o.status}</span>
-                            <p class="font-mono text-xs text-muted" style="margin-top:8px;">${new Date(o.created_at).toLocaleDateString()}</p>
+                        <div style="text-align:right; flex-shrink:0;">
+                            <span class="badge badge-${o.status}">${statusLabel}</span>
+                            <p class="font-mono text-muted" style="font-size:10px; margin-top:6px;">${new Date(o.created_at).toLocaleDateString()}</p>
                         </div>
                     </div>
-                    ${o.tracking_number ? `<p class="font-mono text-xs mt-4" style="color:#a855f7;">Tracking: ${o.tracking_number}</p>` : ''}
-                    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-                        ${o.items.filter(i=>i.id).map(i => `<span class="font-mono text-xs" style="background:rgba(255,255,255,0.05); padding:4px 8px;">${i.product_name} x${i.quantity}</span>`).join('')}
+                    ${o.tracking_number ? `
+                    <div style="margin-top:10px; padding:8px 12px; background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.2); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <span class="font-mono" style="font-size:11px; color:#a855f7;">${o.tracking_number}</span>
+                        ${o.shipping_carrier && o.shipping_carrier !== 'other' ? `<span class="font-mono" style="font-size:10px; background:rgba(168,85,247,0.15); color:#a855f7; padding:2px 8px;">${o.shipping_carrier.toUpperCase()}</span>` : ''}
+                    </div>` : ''}
+                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                        ${(o.items||[]).filter(i=>i.id).map(i => `<span class="font-mono" style="font-size:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:3px 8px;">${i.product_name} ×${i.quantity}</span>`).join('')}
                     </div>
-                </div>
-            `).join('');
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                        <span class="font-mono text-muted" style="font-size:10px;">TAP FOR DETAILS</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         async function viewOrderDetail(id) {

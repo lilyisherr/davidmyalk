@@ -178,9 +178,29 @@
 
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .quick-actions { grid-template-columns: 1fr; }
+            .quick-actions { grid-template-columns: 1fr 1fr; gap: 8px; }
             .user-detail-grid { grid-template-columns: 1fr; }
-            .admin-title { font-size: 28px; }
+            .admin-title { font-size: 26px; }
+            .admin-header { margin-bottom: 20px; }
+            #overview-bottom-grid { grid-template-columns: 1fr !important; }
+            .section-card { padding: 16px; }
+            /* Settings: hide tab bar, show select on mobile */
+            #settings-tabs-bar { display: none !important; }
+            #settings-tab-select { display: block !important; }
+            /* Compact search bar */
+            .search-bar { gap: 8px; }
+            #product-filter-tabs { flex-wrap: wrap; gap: 4px; }
+            /* Better admin header on mobile */
+            .admin-header { gap: 10px; }
+            .admin-subtitle { font-size: 10px; }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .stat-card-v2 { padding: 14px 16px; }
+            .stat-value-v2 { font-size: 24px; }
+            .quick-actions { grid-template-columns: 1fr; }
+            .quick-action-btn { padding: 12px 14px; }
         }
     </style>
 </head>
@@ -212,6 +232,32 @@
         <a href="/admin" style="font-family:var(--font-display);font-size:20px;letter-spacing:0.1em;color:var(--primary);">ADMIN</a>
         <a href="#" onclick="logout()" style="font-family:var(--font-display);font-size:20px;letter-spacing:0.1em;color:#ef4444;">LOGOUT</a>
     </div>
+
+    <!-- Mobile bottom navigation for admin -->
+    <nav class="mobile-bottom-nav" id="admin-mobile-nav">
+        <div class="mobile-bottom-nav-inner">
+            <button class="mbn-btn active" id="mbn-overview" onclick="showSection('overview')">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Overview
+            </button>
+            <button class="mbn-btn" id="mbn-products" onclick="showSection('products')">
+                <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+                Products
+            </button>
+            <button class="mbn-btn" id="mbn-orders" onclick="showSection('orders')">
+                <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                Orders
+            </button>
+            <button class="mbn-btn" id="mbn-users" onclick="showSection('users')">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                Users
+            </button>
+            <button class="mbn-btn" id="mbn-settings" onclick="showSection('settings')">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </button>
+        </div>
+    </nav>
 
     <div class="sidebar-layout">
         <div class="sidebar">
@@ -305,7 +351,7 @@
                     </button>
                 </div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+                <div id="overview-bottom-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
                     <div class="section-card">
                         <div class="section-card-header">
                             <div class="section-card-title">Recent <span>Orders</span></div>
@@ -354,6 +400,7 @@
                     <div>
                         <h2 class="admin-title">ALL <span class="text-red">ORDERS</span></h2>
                         <p class="admin-subtitle">View and manage customer orders</p>
+                        <span class="font-mono" style="font-size:10px;color:var(--text-muted);" id="orders-last-updated"></span>
                     </div>
                     <button class="btn btn-secondary btn-sm" onclick="exportOrdersCSV()">EXPORT CSV</button>
                 </div>
@@ -473,9 +520,24 @@
                         <p class="admin-subtitle">Configure your store, branding, and content</p>
                     </div>
                 </div>
-                <div class="settings-tabs">
+                <!-- Mobile settings select (shown on mobile) -->
+                <select class="input-field" id="settings-tab-select" style="display:none;margin-bottom:20px;max-width:100%;" onchange="showSettingsTab(this.value)">
+                    <option value="general">General</option>
+                    <option value="shipping">Shipping &amp; Tax</option>
+                    <option value="orders">Orders</option>
+                    <option value="payment">Payment</option>
+                    <option value="notifications">Notifications</option>
+                    <option value="branding">Hero / Banner</option>
+                    <option value="content">Content</option>
+                    <option value="socials">Social Links</option>
+                    <option value="checkout">Checkout</option>
+                    <option value="seo">SEO</option>
+                    <option value="policies">Policies</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+                <div class="settings-tabs" id="settings-tabs-bar" style="position:relative;">
                     <button class="settings-tab active" data-tab="general" onclick="showSettingsTab('general')">General</button>
-                    <button class="settings-tab" data-tab="shipping" onclick="showSettingsTab('shipping')">Shipping & Tax</button>
+                    <button class="settings-tab" data-tab="shipping" onclick="showSettingsTab('shipping')">Shipping &amp; Tax</button>
                     <button class="settings-tab" data-tab="orders" onclick="showSettingsTab('orders')">Orders</button>
                     <button class="settings-tab" data-tab="payment" onclick="showSettingsTab('payment')">Payment</button>
                     <button class="settings-tab" data-tab="notifications" onclick="showSettingsTab('notifications')">Notifications</button>
@@ -1099,6 +1161,16 @@
             updateDateTime();
             setInterval(updateDateTime, 60000);
             loadAll();
+            // Auto-refresh orders every 30 seconds
+            setInterval(async () => {
+                const ordersSection = document.getElementById('orders-section');
+                if (ordersSection && ordersSection.style.display !== 'none') {
+                    await loadOrders(true);
+                } else {
+                    // Always silently refresh stats
+                    await loadStats();
+                }
+            }, 30000);
         }
 
         function updateDateTime() {
@@ -1289,6 +1361,9 @@
             if (panel) panel.style.display = 'block';
             const tabBtn = document.querySelector(`.settings-tab[data-tab="${tab}"]`);
             if (tabBtn) tabBtn.classList.add('active');
+            // Sync mobile select
+            const sel = document.getElementById('settings-tab-select');
+            if (sel) sel.value = tab;
         }
 
         async function saveBulkSettings(keys) {
@@ -1447,6 +1522,13 @@
             document.querySelectorAll('.sidebar-link').forEach((l, i) => {
                 l.classList.toggle('active', sections[i] === name);
             });
+            // Sync mobile bottom nav
+            ['overview','products','orders','users','settings'].forEach(s => {
+                const btn = document.getElementById('mbn-' + s);
+                if (btn) btn.classList.toggle('active', s === name);
+            });
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // ─── DISCOUNTS ────────────────────────────────────────────────────────────
@@ -1619,11 +1701,19 @@
             renderProducts(filtered);
         }
 
-        async function loadOrders() {
-            const res = await fetch('/api/admin/orders');
-            allOrders = await res.json();
-            renderOrders(allOrders);
-            renderRecentOrders(allOrders);
+        async function loadOrders(silent = false) {
+            const el = document.getElementById('orders-last-updated');
+            try {
+                const res = await fetch('/api/admin/orders');
+                const orders = await res.json();
+                allOrders = orders;
+                renderOrders(allOrders);
+                renderRecentOrders(allOrders);
+                const now = new Date();
+                if (el) el.innerHTML = `<span class="live-dot"></span>Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+            } catch(e) {
+                if (el && !silent) el.textContent = 'Failed to load';
+            }
         }
 
         function renderOrders(orders) {
