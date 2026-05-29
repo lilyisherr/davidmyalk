@@ -1,6 +1,6 @@
-// api/checkout.js
-// THIS IS THE KEY DAVID SENT YOU
-const stripe = require('stripe')('sk_test_51T7aEGB9YWRWqBOnfewaL31hksdyb6ZKSsf45ErssZTwSm6OVhr8pi7FpY4CkxaIltJrhfBLF2gyCgvQ69MjidE100PsTRDw9U');
+// api/checkout.js - Legacy Netlify function (not used by the Express server in server.js)
+// The active checkout logic is in server.js under /api/checkout
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -27,8 +27,8 @@ exports.handler = async (event) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `https://davidmyalk.netlify.app/#success`,
-      cancel_url: `https://davidmyalk.netlify.app/#shop`,
+      success_url: `${process.env.SITE_URL || ''}/#success`,
+      cancel_url: `${process.env.SITE_URL || ''}/#shop`,
     });
 
     return {

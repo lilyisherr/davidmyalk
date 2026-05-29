@@ -1,30 +1,39 @@
 # David Myalik Store
 
-A static e-commerce site for drift culture apparel brand "David Myalik / Sideways Always".
+A full-stack e-commerce site for drift culture apparel brand "David Myalik / Sideways Always".
 
 ## Project Structure
 
-- `index.html` — Single-page frontend with embedded CSS and JavaScript
-- `api/checkout.js` — Netlify serverless function for Stripe checkout (not used in dev)
-- `package.json` — Node.js poject with `serve` for local static file serving<
+- `server.js` — Express server with all API routes, auth, and DB initialization
+- `public/` — Static frontend (HTML, CSS, JS)
+- `api/checkout.js` — Legacy Netlify serverless function (not used by the Express server)
+- `package.json` — Node.js project dependencies
 
-## Tech Stac
+## Tech Stack
 
-- Pure static HTML/CSS(no build step)
-- Tailwind CSS via CDN
-- Stripe integration via Netlify Functions (for productin)
-- `serve` package for local development
+- Node.js + Express backend
+- PostgreSQL database (Replit managed)
+- JWT-based authentication (httpOnly cookies)
+- Stripe integration for payments
+- Pure HTML/CSS/Vanilla JS frontend
 
-## Running Locally
+## Running
 
 ```bash
 npm start
 ```
 
-Serves the site on port 5000 at `http://0.0.0.0:5000`.
+Serves the app on port 5000.
 
-## Notes
+## Environment Variables / Secrets
 
-- Stripe secret key is hardcoded in `api/checkout.js` (test key)
-- The checkout API is a Netlify Function — it only works when deployed to Netlify or with a compatible serverless runtime
-- In development, the checkout button will attempt to call `/.netlify/functions/checkout` which won't be available
+- `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Replit)
+- `SESSION_SECRET` — JWT signing secret
+- `STRIPE_SECRET_KEY` — Stripe secret key (set in Replit Secrets)
+- `STRIPE_PUBLISHABLE_KEY` — Stripe publishable key (set in Replit Secrets)
+
+## User Preferences
+
+- Keep the dark drift-culture aesthetic throughout the UI
+- Admin panel accessible at /admin
+- First registered user gets "owner" role automatically
