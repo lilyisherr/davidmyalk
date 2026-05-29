@@ -6,7 +6,7 @@ A static e-commerce site for drift culture apparel brand "David Myalik / Sideway
 
 - `index.html` — Single-page frontend with embedded CSS and JavaScript
 - `api/checkout.js` — Netlify serverless function for Stripe checkout (not used in dev)
-- `package.json` — Node.js project with `serve` for local static file serving<
+- `package.json` — Node.js poject with `serve` for local static file serving<
 
 ## Tech Stack
 
