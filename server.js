@@ -121,11 +121,27 @@ async function initDb() {
             expires_at TIMESTAMP NOT NULL,
             created_at TIMESTAMP DEFAULT NOW()
         );
+
+        CREATE TABLE IF NOT EXISTS discount_codes (
+            id SERIAL PRIMARY KEY,
+            code VARCHAR(50) UNIQUE NOT NULL,
+            type VARCHAR(20) NOT NULL DEFAULT 'percentage',
+            value DECIMAL(10,2) NOT NULL,
+            min_order_amount DECIMAL(10,2) DEFAULT 0,
+            usage_limit INTEGER DEFAULT NULL,
+            usage_count INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT true,
+            expires_at TIMESTAMP DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
     `);
 
-    // Add phone column if missing (migration)
+    // Migrations
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT ''`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number VARCHAR(255) DEFAULT ''`);
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT ''`);
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code VARCHAR(50) DEFAULT ''`);
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`);
 
     // Seed default settings
     const defaults = [
@@ -468,12 +484,43 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
     if (!stripeKey) return res.status(503).json({ error: 'Stripe is not configured' });
     try {
         const stripe = require('stripe')(stripeKey);
-        const { cart, shipping } = req.body;
+        const { cart, shipping, discountCode } = req.body;
         if (!cart || !cart.length) return res.status(400).json({ error: 'Cart is empty' });
 
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host;
         const baseUrl = `${protocol}://${host}`;
+
+        // Validate discount if provided
+        let appliedDiscount = null;
+        if (discountCode) {
+            const dc = await pool.query(
+                `SELECT * FROM discount_codes WHERE UPPER(code) = UPPER($1) AND is_active = true
+                 AND (expires_at IS NULL OR expires_at > NOW())
+                 AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+                [discountCode]
+            );
+            if (dc.rows.length) {
+                appliedDiscount = dc.rows[0];
+            }
+        }
+
+        const shippingCostRow = await pool.query("SELECT value FROM settings WHERE key = 'shipping_cost'");
+        const shippingCost = parseFloat(shippingCostRow.rows[0]?.value || '8.99');
+        const freeThresholdRow = await pool.query("SELECT value FROM settings WHERE key = 'free_shipping_threshold'");
+        const freeThreshold = parseFloat(freeThresholdRow.rows[0]?.value || '0');
+        const subtotal = cart.reduce((acc, i) => acc + parseFloat(i.price) * i.qty, 0);
+        const effectiveShipping = (freeThreshold > 0 && subtotal >= freeThreshold) ? 0 : shippingCost;
+
+        let discountAmount = 0;
+        if (appliedDiscount) {
+            if (appliedDiscount.type === 'percentage') {
+                discountAmount = subtotal * (parseFloat(appliedDiscount.value) / 100);
+            } else {
+                discountAmount = Math.min(parseFloat(appliedDiscount.value), subtotal);
+            }
+            discountAmount = Math.round(discountAmount * 100) / 100;
+        }
 
         const lineItems = cart.map(item => ({
             price_data: {
@@ -484,7 +531,7 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
             quantity: item.qty,
         }));
 
-        const session = await stripe.checkout.sessions.create({
+        const sessionData = {
             payment_method_types: ['card'],
             line_items: lineItems,
             mode: 'payment',
@@ -493,9 +540,37 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
             metadata: {
                 user_id: String(req.user.id),
                 cart: JSON.stringify(cart),
-                shipping: JSON.stringify(shipping || {})
+                shipping: JSON.stringify(shipping || {}),
+                discount_code: appliedDiscount ? appliedDiscount.code : '',
+                discount_amount: String(discountAmount),
+                shipping_cost: String(effectiveShipping)
             }
-        });
+        };
+
+        // Apply discount as a coupon if any
+        if (discountAmount > 0) {
+            const coupon = await stripe.coupons.create({
+                amount_off: Math.round(discountAmount * 100),
+                currency: 'usd',
+                duration: 'once',
+                name: appliedDiscount.code
+            });
+            sessionData.discounts = [{ coupon: coupon.id }];
+        }
+
+        // Add shipping as a line item if applicable
+        if (effectiveShipping > 0) {
+            sessionData.line_items.push({
+                price_data: {
+                    currency: 'usd',
+                    product_data: { name: 'Standard Shipping' },
+                    unit_amount: Math.round(effectiveShipping * 100),
+                },
+                quantity: 1,
+            });
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionData);
         res.json({ url: session.url });
     } catch (err) {
         console.error('Checkout error:', err.message);
@@ -527,9 +602,8 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
         const prefix = (await pool.query("SELECT value FROM settings WHERE key = 'order_prefix'")).rows[0]?.value || 'DM';
         const orderNum = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
         const shippingCostRow = await pool.query("SELECT value FROM settings WHERE key = 'shipping_cost'");
-        const shippingCost = parseFloat(shippingCostRow.rows[0]?.value || '8.99');
+        let shippingCost = parseFloat(shippingCostRow.rows[0]?.value || '8.99');
         const subtotal = cart.reduce((acc, i) => acc + (parseFloat(i.price) * i.qty), 0);
-        const total = subtotal + shippingCost;
 
         // Build items array matching the expected shape
         const items = cart.map(i => ({
@@ -540,16 +614,37 @@ app.post('/api/checkout/complete', requireAuth, async (req, res) => {
             quantity: i.qty
         }));
 
+        // Get discount info from Stripe session metadata if available
+        const discountCode = sessionId && process.env.STRIPE_SECRET_KEY ? (() => { try { return JSON.parse('""'); } catch { return ''; } })() : '';
+        let discountAmount = 0;
+        let discountCodeStr = '';
+        if (sessionId && process.env.STRIPE_SECRET_KEY) {
+            try {
+                const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+                const sess = await stripe.checkout.sessions.retrieve(sessionId);
+                discountCodeStr = sess.metadata?.discount_code || '';
+                discountAmount = parseFloat(sess.metadata?.discount_amount || '0');
+                const storedShipping = parseFloat(sess.metadata?.shipping_cost || '0');
+                if (!isNaN(storedShipping)) shippingCost = storedShipping;
+            } catch {}
+        }
+
+        const total = subtotal + shippingCost - discountAmount;
         const r = await pool.query(
-            `INSERT INTO orders (order_number, user_id, status, subtotal, shipping_cost, total,
+            `INSERT INTO orders (order_number, user_id, status, subtotal, shipping_cost, total, discount_code, discount_amount,
                 shipping_first_name, shipping_last_name, shipping_address, shipping_city,
                 shipping_state, shipping_zip, shipping_country, items, stripe_session_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-            [orderNum, req.user.id, 'pending', subtotal, shippingCost, total,
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+            [orderNum, req.user.id, 'pending', subtotal, shippingCost, total, discountCodeStr, discountAmount,
                 shipping.firstName || '', shipping.lastName || '', shipping.address || '',
                 shipping.city || '', shipping.state || '', shipping.zip || '', shipping.country || 'US',
                 JSON.stringify(items), sessionId || '']
         );
+
+        // Increment discount usage count
+        if (discountCodeStr) {
+            await pool.query('UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)', [discountCodeStr]).catch(() => {});
+        }
         res.json({ order: r.rows[0] });
     } catch (err) {
         console.error('Checkout complete error:', err.message);
@@ -707,11 +802,11 @@ app.get('/api/admin/orders', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
-    const { status, trackingNumber } = req.body;
+    const { status, trackingNumber, shippingCarrier } = req.body;
     try {
         const r = await pool.query(
-            'UPDATE orders SET status=$1, tracking_number=$2, updated_at=NOW() WHERE id=$3 RETURNING *',
-            [status, trackingNumber || '', req.params.id]
+            'UPDATE orders SET status=$1, tracking_number=$2, shipping_carrier=$3, updated_at=NOW() WHERE id=$4 RETURNING *',
+            [status, trackingNumber || '', shippingCarrier || '', req.params.id]
         );
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
         await adminLog(req, 'update_order', `Updated order ${r.rows[0].order_number} status to ${status}`);
@@ -845,6 +940,96 @@ app.put('/api/admin/settings/shipping', requireAdmin, async (req, res) => {
             ['shipping_cost', String(parseFloat(shippingCost))]
         );
         await adminLog(req, 'update_shipping', `Updated shipping cost to $${shippingCost}`);
+        res.json({ ok: true });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ─── DISCOUNTS (public validate) ─────────────────────────────────────────────
+app.post('/api/discounts/validate', requireAuth, async (req, res) => {
+    const { code, subtotal } = req.body;
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+    try {
+        const r = await pool.query(
+            `SELECT * FROM discount_codes WHERE UPPER(code) = UPPER($1) AND is_active = true
+             AND (expires_at IS NULL OR expires_at > NOW())
+             AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+            [code]
+        );
+        if (!r.rows.length) return res.status(400).json({ error: 'Invalid or expired promo code' });
+        const dc = r.rows[0];
+        const sub = parseFloat(subtotal) || 0;
+        if (sub < parseFloat(dc.min_order_amount)) {
+            return res.status(400).json({ error: `Minimum order of $${parseFloat(dc.min_order_amount).toFixed(2)} required for this code` });
+        }
+        let discountAmount = 0;
+        if (dc.type === 'percentage') {
+            discountAmount = sub * (parseFloat(dc.value) / 100);
+        } else {
+            discountAmount = Math.min(parseFloat(dc.value), sub);
+        }
+        res.json({ valid: true, code: dc.code, type: dc.type, value: parseFloat(dc.value), discountAmount: Math.round(discountAmount * 100) / 100 });
+    } catch (err) {
+        console.error('Discount validate error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ─── ADMIN: DISCOUNTS ─────────────────────────────────────────────────────────
+app.get('/api/admin/discounts', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM discount_codes ORDER BY created_at DESC');
+        res.json(r.rows);
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/admin/discounts', requireAdmin, async (req, res) => {
+    const { code, type, value, minOrderAmount, usageLimit, expiresAt, isActive } = req.body;
+    if (!code || !type || value === undefined) return res.status(400).json({ error: 'Code, type, and value are required' });
+    try {
+        const r = await pool.query(
+            `INSERT INTO discount_codes (code, type, value, min_order_amount, usage_limit, is_active, expires_at)
+             VALUES (UPPER($1), $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [code, type, parseFloat(value), parseFloat(minOrderAmount) || 0, usageLimit || null, isActive !== false, expiresAt || null]
+        );
+        await adminLog(req, 'create_discount', `Created discount code: ${code.toUpperCase()}`);
+        res.json(r.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'A code with that name already exists' });
+        console.error(err.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/admin/discounts/:id', requireAdmin, async (req, res) => {
+    const { code, type, value, minOrderAmount, usageLimit, expiresAt, isActive } = req.body;
+    try {
+        const r = await pool.query(
+            `UPDATE discount_codes SET code=UPPER($1), type=$2, value=$3, min_order_amount=$4, usage_limit=$5, is_active=$6, expires_at=$7 WHERE id=$8 RETURNING *`,
+            [code, type, parseFloat(value), parseFloat(minOrderAmount) || 0, usageLimit || null, isActive !== false, expiresAt || null, req.params.id]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+        await adminLog(req, 'update_discount', `Updated discount code: ${code.toUpperCase()}`);
+        res.json(r.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: 'A code with that name already exists' });
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.patch('/api/admin/discounts/:id/toggle', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('UPDATE discount_codes SET is_active = NOT is_active WHERE id=$1 RETURNING *', [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+        await adminLog(req, 'toggle_discount', `Toggled discount code: ${r.rows[0].code}`);
+        res.json(r.rows[0]);
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/admin/discounts/:id', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('DELETE FROM discount_codes WHERE id=$1 RETURNING code', [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+        await adminLog(req, 'delete_discount', `Deleted discount code: ${r.rows[0].code}`);
         res.json({ ok: true });
     } catch { res.status(500).json({ error: 'Server error' }); }
 });

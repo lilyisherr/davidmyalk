@@ -363,7 +363,21 @@
                     <h2 style="font-size:28px;margin-bottom:8px;">CONFIRM <span class="text-red">ORDER</span></h2>
                     <p class="font-mono text-muted" style="font-size:11px;margin-bottom:24px;">Review your order before placing it.</p>
                     <div id="checkout-summary"></div>
-                    <div style="display:flex;justify-content:space-between;margin-top:20px;font-family:var(--font-display);font-size:22px;">
+                    <div style="margin-top:16px;padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid var(--border);">
+                        <div class="font-mono text-xs text-muted" style="margin-bottom:10px;">PROMO CODE</div>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" class="input-field" id="promo-code-input" placeholder="Enter code..." style="flex:1;text-transform:uppercase;letter-spacing:0.1em;" oninput="this.value=this.value.toUpperCase()">
+                            <button onclick="applyPromoCode()" class="btn btn-secondary btn-sm" id="promo-apply-btn" style="min-width:70px;">APPLY</button>
+                        </div>
+                        <div id="promo-status" style="margin-top:8px;font-family:var(--font-mono);font-size:11px;min-height:16px;"></div>
+                    </div>
+                    <div style="margin-top:16px;font-family:var(--font-mono);font-size:12px;">
+                        <div id="discount-line" style="display:none;justify-content:space-between;color:#22c55e;margin-bottom:6px;">
+                            <span id="discount-label">PROMO DISCOUNT</span>
+                            <span id="discount-amount-display">-$0.00</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-display);font-size:22px;">
                         <span>TOTAL</span>
                         <span id="checkout-total" class="text-red">$0.00</span>
                     </div>
@@ -555,6 +569,7 @@
         let activeAvailability = 'all';
         let activePriceRange = 'all';
         let SHIPPING_COST = 15.00;
+        let appliedDiscount = null;
 
         function dismissBanner() {
             const banner = document.getElementById('site-banner');
@@ -575,13 +590,15 @@
         async function init() {
             loadCart();
 
-            const [prodRes, authRes] = await Promise.all([
-                fetch('/api/products'),
-                fetch('/api/auth/me')
-            ]);
-            products = await prodRes.json();
-            const authData = await authRes.json();
-            currentUser = authData.user;
+            // Fetch products and auth independently so a failure in one doesn't kill the other
+            try {
+                const [prodRes, authRes] = await Promise.all([
+                    fetch('/api/products'),
+                    fetch('/api/auth/me')
+                ]);
+                try { products = await prodRes.json(); } catch { products = []; }
+                try { const d = await authRes.json(); currentUser = d.user || null; } catch { currentUser = null; }
+            } catch { products = []; currentUser = null; }
 
             cart = cart.filter(item => products.some(p => p.id === item.id && p.is_active));
             saveCart();
@@ -941,11 +958,16 @@
                 else { ind.style.background = 'transparent'; ind.style.color = 'white'; ind.style.borderColor = 'rgba(255,255,255,0.3)'; ind.innerHTML = i; }
             }
             if (step === 2) {
+                // Reset promo when entering step 2
+                appliedDiscount = null;
+                document.getElementById('promo-code-input').value = '';
+                document.getElementById('promo-status').textContent = '';
+                document.getElementById('promo-apply-btn').textContent = 'APPLY';
+                document.getElementById('promo-apply-btn').disabled = false;
+
                 const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
                 const freeThreshold = window.FREE_SHIPPING_THRESHOLD || 0;
                 const effectiveShipping = (freeThreshold > 0 && subtotal >= freeThreshold) ? 0 : SHIPPING_COST;
-                const total = subtotal + effectiveShipping;
-                document.getElementById('checkout-total').textContent = `$${total.toFixed(2)}`;
                 const shippingLabel = effectiveShipping === 0 ? '<span style="color:#22c55e;">FREE</span>' : `$${effectiveShipping.toFixed(2)}`;
                 document.getElementById('checkout-summary').innerHTML = `
                     <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);padding:16px;margin-bottom:16px;">
@@ -962,10 +984,77 @@
                         </div>
                     `).join('')}
                     <div style="padding-top:12px;display:flex;justify-content:space-between;" class="font-mono text-xs text-muted">
+                        <span>Subtotal</span><span>$${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div style="padding-top:6px;display:flex;justify-content:space-between;" class="font-mono text-xs text-muted">
                         <span>Shipping</span><span>${shippingLabel}</span>
                     </div>
                     ${freeThreshold > 0 && subtotal < freeThreshold ? `<div class="font-mono text-xs" style="color:#f59e0b;margin-top:8px;text-align:center;">Add $${(freeThreshold - subtotal).toFixed(2)} more for free shipping!</div>` : ''}
                 `;
+                updateCheckoutTotal();
+            }
+        }
+
+        async function applyPromoCode() {
+            const code = document.getElementById('promo-code-input').value.trim();
+            const btn = document.getElementById('promo-apply-btn');
+            const status = document.getElementById('promo-status');
+
+            if (appliedDiscount) {
+                appliedDiscount = null;
+                document.getElementById('promo-code-input').value = '';
+                status.textContent = '';
+                btn.textContent = 'APPLY';
+                updateCheckoutTotal();
+                return;
+            }
+
+            if (!code) { status.innerHTML = '<span style="color:#ef4444;">Enter a promo code first</span>'; return; }
+            btn.disabled = true; btn.textContent = '...';
+
+            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            try {
+                const res = await fetch('/api/discounts/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, subtotal })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    status.innerHTML = `<span style="color:#ef4444;">&#10005; ${data.error}</span>`;
+                    appliedDiscount = null;
+                    btn.textContent = 'APPLY';
+                } else {
+                    appliedDiscount = data;
+                    const desc = data.type === 'percentage' ? `${data.value}% off` : `$${data.value.toFixed(2)} off`;
+                    status.innerHTML = `<span style="color:#22c55e;">&#10003; <strong>${data.code}</strong> — ${desc} applied!</span>`;
+                    btn.textContent = 'REMOVE';
+                }
+            } catch {
+                status.innerHTML = '<span style="color:#ef4444;">&#10005; Could not apply code</span>';
+                appliedDiscount = null;
+                btn.textContent = 'APPLY';
+            }
+            btn.disabled = false;
+            updateCheckoutTotal();
+        }
+
+        function updateCheckoutTotal() {
+            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            const freeThreshold = window.FREE_SHIPPING_THRESHOLD || 0;
+            const effectiveShipping = (freeThreshold > 0 && subtotal >= freeThreshold) ? 0 : SHIPPING_COST;
+            const discountAmt = appliedDiscount ? appliedDiscount.discountAmount : 0;
+            const total = Math.max(0, subtotal + effectiveShipping - discountAmt);
+            document.getElementById('checkout-total').textContent = `$${total.toFixed(2)}`;
+            const discountLine = document.getElementById('discount-line');
+            if (discountLine) {
+                if (discountAmt > 0 && appliedDiscount) {
+                    discountLine.style.display = 'flex';
+                    document.getElementById('discount-label').textContent = `PROMO: ${appliedDiscount.code}`;
+                    document.getElementById('discount-amount-display').textContent = `-$${discountAmt.toFixed(2)}`;
+                } else {
+                    discountLine.style.display = 'none';
+                }
             }
         }
 
@@ -988,7 +1077,7 @@
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, shipping })
+                    body: JSON.stringify({ cart, shipping, discountCode: appliedDiscount?.code || '' })
                 });
                 const data = await res.json();
                 if (!res.ok) {

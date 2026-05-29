@@ -239,6 +239,10 @@
                 <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 Activity Log
             </a>
+            <a href="#" class="sidebar-link" onclick="showSection('discounts')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                Discounts
+            </a>
             <a href="#" class="sidebar-link" onclick="showSection('settings')">
                 <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 Settings
@@ -382,6 +386,68 @@
                             <tr><th>User</th><th>Email</th><th>Role</th><th>Orders</th><th>Joined</th><th>Actions</th></tr>
                         </thead>
                         <tbody id="users-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="discounts-section" style="display:none;">
+                <div class="admin-header">
+                    <div>
+                        <h2 class="admin-title">DISCOUNT <span class="text-red">CODES</span></h2>
+                        <p class="admin-subtitle">Create and manage promo codes for your store</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="toggleDiscountForm()">+ CREATE CODE</button>
+                </div>
+
+                <div class="section-card" id="discount-create-form" style="display:none;margin-bottom:24px;max-width:700px;">
+                    <div class="font-mono text-xs text-muted mb-4">NEW DISCOUNT CODE</div>
+                    <div class="grid-2 mb-4">
+                        <div>
+                            <label class="input-label">CODE</label>
+                            <input type="text" class="input-field" id="dc-code" placeholder="e.g. SIDEWAYS20" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+                            <span class="font-mono text-xs text-muted">Customers type this at checkout</span>
+                        </div>
+                        <div>
+                            <label class="input-label">TYPE</label>
+                            <select class="input-field" id="dc-type" onchange="updateDiscountValueLabel()">
+                                <option value="percentage">Percentage Off (%)</option>
+                                <option value="fixed">Fixed Amount Off ($)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid-2 mb-4">
+                        <div>
+                            <label class="input-label" id="dc-value-label">DISCOUNT VALUE (%)</label>
+                            <input type="number" step="0.01" min="0" class="input-field" id="dc-value" placeholder="e.g. 20">
+                        </div>
+                        <div>
+                            <label class="input-label">MINIMUM ORDER ($)</label>
+                            <input type="number" step="0.01" min="0" class="input-field" id="dc-min-order" placeholder="0 = no minimum">
+                        </div>
+                    </div>
+                    <div class="grid-2 mb-4">
+                        <div>
+                            <label class="input-label">USAGE LIMIT</label>
+                            <input type="number" min="1" class="input-field" id="dc-usage-limit" placeholder="Leave blank for unlimited">
+                        </div>
+                        <div>
+                            <label class="input-label">EXPIRY DATE</label>
+                            <input type="datetime-local" class="input-field" id="dc-expires">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:center;">
+                        <button class="btn btn-primary btn-sm" onclick="createDiscount()">CREATE CODE</button>
+                        <button class="btn btn-secondary btn-sm" onclick="toggleDiscountForm()">CANCEL</button>
+                        <div id="dc-status" class="font-mono text-xs text-muted"></div>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Used / Limit</th><th>Expires</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="discounts-table"></tbody>
                     </table>
                 </div>
             </div>
@@ -870,7 +936,7 @@
         let categories = [];
         let imageMode = 'upload';
         let uploadedImageUrl = '';
-        const sections = ['overview', 'products', 'orders', 'users', 'logs', 'settings'];
+        const sections = ['overview', 'products', 'orders', 'users', 'logs', 'discounts', 'settings'];
 
         async function init() {
             const res = await fetch('/api/auth/me');
@@ -894,7 +960,7 @@
         }
 
         async function loadAll() {
-            await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs()]);
+            await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts()]);
         }
 
         let allLogs = [];
@@ -1188,6 +1254,94 @@
             document.querySelectorAll('.sidebar-link').forEach((l, i) => {
                 l.classList.toggle('active', sections[i] === name);
             });
+        }
+
+        // ─── DISCOUNTS ────────────────────────────────────────────────────────────
+        function toggleDiscountForm() {
+            const f = document.getElementById('discount-create-form');
+            f.style.display = f.style.display === 'none' ? 'block' : 'none';
+            if (f.style.display === 'block') {
+                document.getElementById('dc-code').value = '';
+                document.getElementById('dc-value').value = '';
+                document.getElementById('dc-min-order').value = '';
+                document.getElementById('dc-usage-limit').value = '';
+                document.getElementById('dc-expires').value = '';
+                document.getElementById('dc-status').textContent = '';
+            }
+        }
+
+        function updateDiscountValueLabel() {
+            const type = document.getElementById('dc-type').value;
+            document.getElementById('dc-value-label').textContent = type === 'percentage' ? 'DISCOUNT VALUE (%)' : 'DISCOUNT AMOUNT ($)';
+        }
+
+        async function loadDiscounts() {
+            const res = await fetch('/api/admin/discounts');
+            if (!res.ok) { document.getElementById('discounts-table').innerHTML = '<tr><td colspan="8" class="text-muted text-center">Failed to load</td></tr>'; return; }
+            const codes = await res.json();
+            const tbody = document.getElementById('discounts-table');
+            if (!codes.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center">No discount codes yet</td></tr>'; return; }
+            tbody.innerHTML = codes.map(c => {
+                const valueStr = c.type === 'percentage' ? `${parseFloat(c.value)}%` : `$${parseFloat(c.value).toFixed(2)}`;
+                const minStr = parseFloat(c.min_order_amount) > 0 ? `$${parseFloat(c.min_order_amount).toFixed(2)}` : '—';
+                const limitStr = c.usage_limit ? `${c.usage_count}/${c.usage_limit}` : `${c.usage_count}/∞`;
+                const expiresStr = c.expires_at ? new Date(c.expires_at).toLocaleDateString() : '—';
+                const statusBadge = c.is_active
+                    ? '<span style="color:#22c55e;font-size:10px;font-family:var(--font-mono);">ACTIVE</span>'
+                    : '<span style="color:#6b7280;font-size:10px;font-family:var(--font-mono);">INACTIVE</span>';
+                return `<tr>
+                    <td class="font-mono" style="color:#f59e0b;letter-spacing:0.05em;">${c.code}</td>
+                    <td class="font-mono text-xs text-muted">${c.type.toUpperCase()}</td>
+                    <td class="font-mono">${valueStr}</td>
+                    <td class="font-mono text-xs text-muted">${minStr}</td>
+                    <td class="font-mono text-xs">${limitStr}</td>
+                    <td class="font-mono text-xs text-muted">${expiresStr}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-sm" style="font-size:10px;" onclick="toggleDiscount(${c.id})">${c.is_active ? 'Deactivate' : 'Activate'}</button>
+                            <button class="btn btn-sm" style="font-size:10px;background:rgba(239,68,68,0.15);color:#ef4444;" onclick="deleteDiscount(${c.id}, '${c.code}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function createDiscount() {
+            const code = document.getElementById('dc-code').value.trim();
+            const type = document.getElementById('dc-type').value;
+            const value = document.getElementById('dc-value').value;
+            const minOrderAmount = document.getElementById('dc-min-order').value || '0';
+            const usageLimit = document.getElementById('dc-usage-limit').value || null;
+            const expiresAt = document.getElementById('dc-expires').value || null;
+            const status = document.getElementById('dc-status');
+            if (!code || !value) { status.innerHTML = '<span style="color:#ef4444;">Code and value are required</span>'; return; }
+            const res = await fetch('/api/admin/discounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, type, value, minOrderAmount, usageLimit, expiresAt, isActive: true })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(`Code ${data.code} created!`, 'success');
+                toggleDiscountForm();
+                loadDiscounts();
+            } else {
+                status.innerHTML = `<span style="color:#ef4444;">${data.error}</span>`;
+            }
+        }
+
+        async function toggleDiscount(id) {
+            const res = await fetch(`/api/admin/discounts/${id}/toggle`, { method: 'PATCH' });
+            if (res.ok) { loadDiscounts(); }
+            else showToast('Failed to toggle code', 'error');
+        }
+
+        async function deleteDiscount(id, code) {
+            if (!confirm(`Delete discount code "${code}"? This cannot be undone.`)) return;
+            const res = await fetch(`/api/admin/discounts/${id}`, { method: 'DELETE' });
+            if (res.ok) { showToast(`Code ${code} deleted`, 'success'); loadDiscounts(); }
+            else showToast('Failed to delete code', 'error');
         }
 
         async function loadStats() {
@@ -1691,15 +1845,25 @@
                 </div>
                 <div class="section-card">
                     <div class="font-mono text-xs text-muted mb-4">UPDATE STATUS</div>
-                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-                        <select class="input-field" id="order-status-select" style="max-width:200px;">
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+                        <select class="input-field" id="order-status-select" style="max-width:180px;">
                             <option value="pending" ${o.status==='pending'?'selected':''}>Pending</option>
                             <option value="processing" ${o.status==='processing'?'selected':''}>Processing</option>
                             <option value="shipped" ${o.status==='shipped'?'selected':''}>Shipped</option>
                             <option value="delivered" ${o.status==='delivered'?'selected':''}>Delivered</option>
                             <option value="cancelled" ${o.status==='cancelled'?'selected':''}>Cancelled</option>
                         </select>
-                        <input type="text" class="input-field" id="order-tracking" placeholder="Tracking Number" value="${o.tracking_number||''}" style="max-width:250px;">
+                        <select class="input-field" id="order-carrier" style="max-width:150px;">
+                            <option value="" ${!o.shipping_carrier?'selected':''}>No Carrier</option>
+                            <option value="usps" ${o.shipping_carrier==='usps'?'selected':''}>USPS</option>
+                            <option value="ups" ${o.shipping_carrier==='ups'?'selected':''}>UPS</option>
+                            <option value="fedex" ${o.shipping_carrier==='fedex'?'selected':''}>FedEx</option>
+                            <option value="dhl" ${o.shipping_carrier==='dhl'?'selected':''}>DHL</option>
+                            <option value="other" ${o.shipping_carrier==='other'?'selected':''}>Other</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                        <input type="text" class="input-field" id="order-tracking" placeholder="Tracking Number" value="${o.tracking_number||''}" style="flex:1;min-width:160px;">
                         <button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${o.id})">UPDATE</button>
                     </div>
                 </div>
@@ -1714,10 +1878,11 @@
         async function updateOrderStatus(id) {
             const status = document.getElementById('order-status-select').value;
             const trackingNumber = document.getElementById('order-tracking').value;
+            const shippingCarrier = document.getElementById('order-carrier').value;
             const res = await fetch(`/api/admin/orders/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status, trackingNumber })
+                body: JSON.stringify({ status, trackingNumber, shippingCarrier })
             });
             if (res.ok) { showToast('Order updated!', 'success'); closeOrderModal(); loadOrders(); loadStats(); }
             else showToast('Failed to update', 'error');

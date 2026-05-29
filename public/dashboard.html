@@ -229,7 +229,19 @@
                     <div class="stat-card"><span class="stat-label">ORDER NUMBER</span><span class="font-mono" style="font-size:14px;">${order.order_number}</span></div>
                     <div class="stat-card"><span class="stat-label">STATUS</span><span class="badge badge-${order.status}" style="margin-top:4px;">${order.status}</span></div>
                 </div>
-                ${order.tracking_number ? `<div class="card mb-4"><span class="font-mono text-xs text-muted">TRACKING NUMBER</span><p class="font-mono" style="color:#a855f7; margin-top:4px;">${order.tracking_number}</p></div>` : ''}
+                ${order.tracking_number ? `
+                <div class="card mb-4">
+                    <span class="font-mono text-xs text-muted">PACKAGE TRACKING</span>
+                    <div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;">
+                        <span class="font-mono" style="color:#a855f7;">${order.tracking_number}</span>
+                        ${order.shipping_carrier && order.shipping_carrier !== 'other' ? `
+                        <a href="${getTrackingUrl(order.shipping_carrier, order.tracking_number)}" target="_blank" rel="noopener"
+                           class="btn btn-sm" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.3);font-size:10px;">
+                            TRACK ON ${order.shipping_carrier.toUpperCase()} ↗
+                        </a>` : ''}
+                    </div>
+                    ${order.shipping_carrier ? `<p class="font-mono text-xs text-muted" style="margin-top:6px;">Carrier: ${order.shipping_carrier.toUpperCase()}</p>` : ''}
+                </div>` : ''}
                 <div class="card mb-4">
                     <span class="font-mono text-xs text-muted">SHIPPING TO</span>
                     <p style="margin-top:8px;">${order.shipping_first_name} ${order.shipping_last_name}</p>
@@ -247,12 +259,24 @@
                     <div style="padding-top:12px; text-align:right;">
                         <p class="font-mono text-xs text-muted">Subtotal: $${parseFloat(order.subtotal).toFixed(2)}</p>
                         <p class="font-mono text-xs text-muted">Shipping: $${parseFloat(order.shipping_cost).toFixed(2)}</p>
+                        ${order.discount_amount && parseFloat(order.discount_amount) > 0 ? `<p class="font-mono text-xs" style="color:#22c55e;">Promo (${order.discount_code}): -$${parseFloat(order.discount_amount).toFixed(2)}</p>` : ''}
                         <p class="font-display" style="font-size:20px; color:var(--primary); margin-top:4px;">TOTAL: $${parseFloat(order.total).toFixed(2)}</p>
                     </div>
                 </div>
                 <p class="font-mono text-xs text-muted">Ordered on ${new Date(order.created_at).toLocaleString()}</p>
             `;
             document.getElementById('order-detail-modal').classList.add('open');
+        }
+
+        function getTrackingUrl(carrier, trackingNumber) {
+            const tn = encodeURIComponent(trackingNumber);
+            const urls = {
+                'usps': `https://tools.usps.com/go/TrackConfirmAction?tLabels=${tn}`,
+                'ups': `https://www.ups.com/track?tracknum=${tn}`,
+                'fedex': `https://www.fedex.com/apps/fedextrack/?action=track&trackingnumber=${tn}`,
+                'dhl': `https://www.dhl.com/en/express/tracking.html?AWB=${tn}`
+            };
+            return urls[carrier?.toLowerCase()] || null;
         }
 
         function closeOrderDetail() { document.getElementById('order-detail-modal').classList.remove('open'); }
