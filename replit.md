@@ -12,7 +12,7 @@ A static e-commerce site for drift culture apparel brand "David Myalik / Sideway
 
 - Pure static HTML/CSS(no build step)
 - Tailwind CSS via CDN
-- Stripe integration via Netlify Functions (for production)
+- Stripe integration via Netlify Functions (for productin)
 - `serve` package for local development
 
 ## Running Locally
