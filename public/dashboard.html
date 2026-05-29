@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | DAVID MYALIK</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+</head>
+<body>
+    <nav class="nav-auth">
+        <div class="nav-auth-inner">
+            <a href="/" class="nav-brand">DAVID <span>MYALIK</span></a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Store</a>
+                <a href="/dashboard" class="nav-link" style="color:var(--primary);">Dashboard</a>
+                <div class="nav-user">
+                    <div class="nav-avatar" id="user-avatar"></div>
+                    <span id="user-name-display"></span>
+                </div>
+                <a href="#" class="nav-link" onclick="logout()" style="color:#ef4444;">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="sidebar-layout">
+        <div class="sidebar">
+            <a href="#" class="sidebar-link active" onclick="showSection('orders')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                My Orders
+            </a>
+            <a href="#" class="sidebar-link" onclick="showSection('settings')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                Settings
+            </a>
+            <a href="#" class="sidebar-link" onclick="showSection('addresses')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Addresses
+            </a>
+        </div>
+
+        <div class="main-content">
+            <div id="orders-section">
+                <h2 style="font-size:36px; margin-bottom:8px;">MY <span class="text-red">ORDERS</span></h2>
+                <p class="font-mono text-muted text-xs mb-8">Track and manage your purchases</p>
+                <div id="orders-list"></div>
+            </div>
+
+            <div id="settings-section" style="display:none;">
+                <h2 style="font-size:36px; margin-bottom:8px;">ACCOUNT <span class="text-red">SETTINGS</span></h2>
+                <p class="font-mono text-muted text-xs mb-8">Manage your profile and security</p>
+
+                <div class="card mb-6">
+                    <h3 style="font-size:18px; margin-bottom:20px;">PROFILE <span class="text-red">INFO</span></h3>
+                    <form id="profile-form">
+                        <div class="grid-2 mb-4">
+                            <div>
+                                <label class="input-label">FIRST NAME</label>
+                                <input type="text" class="input-field" id="set-firstName" required>
+                            </div>
+                            <div>
+                                <label class="input-label">LAST NAME</label>
+                                <input type="text" class="input-field" id="set-lastName" required>
+                            </div>
+                        </div>
+                        <div class="grid-2 mb-4">
+                            <div>
+                                <label class="input-label">EMAIL</label>
+                                <input type="email" class="input-field" id="set-email" disabled style="opacity:0.5;">
+                            </div>
+                            <div>
+                                <label class="input-label">PHONE</label>
+                                <input type="tel" class="input-field" id="set-phone" placeholder="Optional">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">SAVE CHANGES</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 style="font-size:18px; margin-bottom:20px;">CHANGE <span class="text-red">PASSWORD</span></h3>
+                    <form id="password-form">
+                        <div style="max-width:400px;">
+                            <div class="mb-4">
+                                <label class="input-label">CURRENT PASSWORD</label>
+                                <input type="password" class="input-field" id="currentPassword" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="input-label">NEW PASSWORD</label>
+                                <input type="password" class="input-field" id="newPassword" required minlength="6">
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">UPDATE PASSWORD</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="addresses-section" style="display:none;">
+                <div class="flex-between mb-8">
+                    <div>
+                        <h2 style="font-size:36px; margin-bottom:8px;">MY <span class="text-red">ADDRESSES</span></h2>
+                        <p class="font-mono text-muted text-xs">Manage your shipping addresses</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()">ADD ADDRESS</button>
+                </div>
+                <div id="addresses-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="address-modal">
+        <div class="modal">
+            <div class="flex-between mb-6">
+                <h3 style="font-size:20px;">ADD <span class="text-red">ADDRESS</span></h3>
+                <button onclick="closeAddressModal()" style="background:none;border:none;color:white;cursor:pointer;font-size:20px;">✕</button>
+            </div>
+            <form id="address-form">
+                <div class="grid-2 mb-4">
+                    <div><label class="input-label">FIRST NAME</label><input type="text" class="input-field" id="addr-firstName" required></div>
+                    <div><label class="input-label">LAST NAME</label><input type="text" class="input-field" id="addr-lastName" required></div>
+                </div>
+                <div class="mb-4"><label class="input-label">ADDRESS LINE 1</label><input type="text" class="input-field" id="addr-line1" required></div>
+                <div class="mb-4"><label class="input-label">ADDRESS LINE 2</label><input type="text" class="input-field" id="addr-line2"></div>
+                <div class="grid-2 mb-4">
+                    <div><label class="input-label">CITY</label><input type="text" class="input-field" id="addr-city" required></div>
+                    <div><label class="input-label">STATE</label><input type="text" class="input-field" id="addr-state"></div>
+                </div>
+                <div class="grid-2 mb-4">
+                    <div><label class="input-label">ZIP CODE</label><input type="text" class="input-field" id="addr-zip" required></div>
+                    <div>
+                        <label class="input-label">COUNTRY</label>
+                        <select class="input-field" id="addr-country">
+                            <option value="US">United States</option>
+                            <option value="CA">Canada</option>
+                            <option value="UK">United Kingdom</option>
+                            <option value="AU">Australia</option>
+                        </select>
+                    </div>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;margin-bottom:20px;cursor:pointer;" class="font-mono text-xs">
+                    <input type="checkbox" id="addr-default"> Set as default address
+                </label>
+                <button type="submit" class="btn btn-primary btn-full">SAVE ADDRESS</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="order-detail-modal">
+        <div class="modal" style="max-width:700px;">
+            <div class="flex-between mb-6">
+                <h3 style="font-size:20px;">ORDER <span class="text-red">DETAILS</span></h3>
+                <button onclick="closeOrderDetail()" style="background:none;border:none;color:white;cursor:pointer;font-size:20px;">✕</button>
+            </div>
+            <div id="order-detail-content"></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        let currentUser = null;
+
+        async function init() {
+            const res = await fetch('/api/auth/me');
+            const data = await res.json();
+            if (!data.user) { window.location.href = '/login'; return; }
+            currentUser = data.user;
+            document.getElementById('user-avatar').textContent = currentUser.first_name[0].toUpperCase();
+            document.getElementById('user-name-display').textContent = currentUser.first_name;
+            document.getElementById('set-firstName').value = currentUser.first_name;
+            document.getElementById('set-lastName').value = currentUser.last_name;
+            document.getElementById('set-email').value = currentUser.email;
+            document.getElementById('set-phone').value = currentUser.phone || '';
+            loadOrders();
+            loadAddresses();
+        }
+
+        function showSection(name) {
+            ['orders', 'settings', 'addresses'].forEach(s => {
+                document.getElementById(s + '-section').style.display = s === name ? 'block' : 'none';
+            });
+            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        async function loadOrders() {
+            const res = await fetch('/api/orders');
+            const orders = await res.json();
+            const container = document.getElementById('orders-list');
+            if (orders.length === 0) {
+                container.innerHTML = `<div class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                    <p>No orders yet. Start shopping!</p>
+                    <a href="/" class="btn btn-primary btn-sm mt-4">BROWSE STORE</a>
+                </div>`;
+                return;
+            }
+            container.innerHTML = orders.map(o => `
+                <div class="card mb-4" style="cursor:pointer;" onclick="viewOrderDetail(${o.id})">
+                    <div class="flex-between">
+                        <div>
+                            <span class="font-mono text-xs text-muted">${o.order_number}</span>
+                            <p class="font-display" style="font-size:18px; margin-top:4px;">$${parseFloat(o.total).toFixed(2)}</p>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="badge badge-${o.status}">${o.status}</span>
+                            <p class="font-mono text-xs text-muted" style="margin-top:8px;">${new Date(o.created_at).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    ${o.tracking_number ? `<p class="font-mono text-xs mt-4" style="color:#a855f7;">Tracking: ${o.tracking_number}</p>` : ''}
+                    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                        ${o.items.filter(i=>i.id).map(i => `<span class="font-mono text-xs" style="background:rgba(255,255,255,0.05); padding:4px 8px;">${i.product_name} x${i.quantity}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewOrderDetail(id) {
+            const res = await fetch(`/api/orders/${id}`);
+            const order = await res.json();
+            const content = document.getElementById('order-detail-content');
+            content.innerHTML = `
+                <div class="grid-2 mb-6">
+                    <div class="stat-card"><span class="stat-label">ORDER NUMBER</span><span class="font-mono" style="font-size:14px;">${order.order_number}</span></div>
+                    <div class="stat-card"><span class="stat-label">STATUS</span><span class="badge badge-${order.status}" style="margin-top:4px;">${order.status}</span></div>
+                </div>
+                ${order.tracking_number ? `<div class="card mb-4"><span class="font-mono text-xs text-muted">TRACKING NUMBER</span><p class="font-mono" style="color:#a855f7; margin-top:4px;">${order.tracking_number}</p></div>` : ''}
+                <div class="card mb-4">
+                    <span class="font-mono text-xs text-muted">SHIPPING TO</span>
+                    <p style="margin-top:8px;">${order.shipping_first_name} ${order.shipping_last_name}</p>
+                    <p class="text-muted text-sm">${order.shipping_address}, ${order.shipping_city} ${order.shipping_zip}, ${order.shipping_country}</p>
+                </div>
+                <div class="card mb-4">
+                    <span class="font-mono text-xs text-muted">ITEMS</span>
+                    ${order.items.filter(i=>i.id).map(i => `
+                        <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border);">
+                            <img src="${i.product_image}" style="width:48px;height:48px;object-fit:cover;filter:grayscale(1);">
+                            <div style="flex:1;"><p class="text-sm">${i.product_name}</p><p class="font-mono text-xs text-muted">Qty: ${i.quantity}</p></div>
+                            <span class="font-mono text-sm">$${(parseFloat(i.price_at_purchase) * i.quantity).toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                    <div style="padding-top:12px; text-align:right;">
+                        <p class="font-mono text-xs text-muted">Subtotal: $${parseFloat(order.subtotal).toFixed(2)}</p>
+                        <p class="font-mono text-xs text-muted">Shipping: $${parseFloat(order.shipping_cost).toFixed(2)}</p>
+                        <p class="font-display" style="font-size:20px; color:var(--primary); margin-top:4px;">TOTAL: $${parseFloat(order.total).toFixed(2)}</p>
+                    </div>
+                </div>
+                <p class="font-mono text-xs text-muted">Ordered on ${new Date(order.created_at).toLocaleString()}</p>
+            `;
+            document.getElementById('order-detail-modal').classList.add('open');
+        }
+
+        function closeOrderDetail() { document.getElementById('order-detail-modal').classList.remove('open'); }
+
+        async function loadAddresses() {
+            const res = await fetch('/api/user/addresses');
+            const addresses = await res.json();
+            const container = document.getElementById('addresses-list');
+            if (addresses.length === 0) {
+                container.innerHTML = `<div class="empty-state"><p>No saved addresses</p></div>`;
+                return;
+            }
+            container.innerHTML = addresses.map(a => `
+                <div class="card mb-4">
+                    <div class="flex-between">
+                        <div>
+                            <p style="font-weight:600;">${a.first_name} ${a.last_name}</p>
+                            <p class="text-muted text-sm">${a.address_line1}${a.address_line2 ? ', ' + a.address_line2 : ''}</p>
+                            <p class="text-muted text-sm">${a.city}${a.state ? ', ' + a.state : ''} ${a.zip}, ${a.country}</p>
+                        </div>
+                        ${a.is_default ? '<span class="badge badge-active">Default</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openAddressModal() { document.getElementById('address-modal').classList.add('open'); }
+        function closeAddressModal() { document.getElementById('address-modal').classList.remove('open'); }
+
+        document.getElementById('address-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/user/addresses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    firstName: document.getElementById('addr-firstName').value,
+                    lastName: document.getElementById('addr-lastName').value,
+                    addressLine1: document.getElementById('addr-line1').value,
+                    addressLine2: document.getElementById('addr-line2').value,
+                    city: document.getElementById('addr-city').value,
+                    state: document.getElementById('addr-state').value,
+                    zip: document.getElementById('addr-zip').value,
+                    country: document.getElementById('addr-country').value,
+                    isDefault: document.getElementById('addr-default').checked
+                })
+            });
+            if (res.ok) { showToast('Address saved!', 'success'); closeAddressModal(); loadAddresses(); e.target.reset(); }
+        });
+
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/user/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    firstName: document.getElementById('set-firstName').value,
+                    lastName: document.getElementById('set-lastName').value,
+                    phone: document.getElementById('set-phone').value
+                })
+            });
+            if (res.ok) showToast('Profile updated!', 'success');
+            else showToast('Failed to update profile', 'error');
+        });
+
+        document.getElementById('password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/user/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    currentPassword: document.getElementById('currentPassword').value,
+                    newPassword: document.getElementById('newPassword').value
+                })
+            });
+            const data = await res.json();
+            if (res.ok) { showToast('Password updated!', 'success'); e.target.reset(); }
+            else showToast(data.error, 'error');
+        });
+
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        }
+
+        function showToast(msg, type) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
