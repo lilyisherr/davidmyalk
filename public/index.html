@@ -718,16 +718,25 @@
 
     <section id="contact" class="contact-section">
         <div class="contact-inner reveal">
+            <div class="font-mono text-muted" style="font-size:11px;letter-spacing:0.2em;margin-bottom:16px;">SUPPORT &amp; COLLABS</div>
             <h2 class="contact-title">GET IN <span class="text-red">TOUCH</span></h2>
-            <p class="font-mono text-muted" style="font-size:12px;margin-bottom:40px;letter-spacing:0.1em;">Questions, collabs, or just wanna talk cars?</p>
-            <a href="mailto:contact@davidmyalik.com" class="btn btn-secondary" style="padding:14px 40px;" id="contact-email-btn">CONTACT US</a>
+            <p class="font-mono text-muted" style="font-size:12px;margin-bottom:16px;letter-spacing:0.05em;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.9;">Order issues, return requests, collabs, or just wanna talk cars — fill out our contact form and we'll get back to you fast.</p>
+            <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:40px;">
+                <div class="font-mono" style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span style="color:#22c55e;">●</span> Usually within 24–48 hrs</div>
+                <div class="font-mono" style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span style="color:#22c55e;">●</span> Track orders 24/7</div>
+                <div class="font-mono" style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span style="color:#22c55e;">●</span> Easy returns</div>
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+                <a href="/contact" class="btn btn-primary" style="padding:14px 40px;" id="contact-email-btn">CONTACT US</a>
+                <a href="/tracking" class="btn btn-secondary" style="padding:14px 36px;">TRACK ORDER</a>
+            </div>
         </div>
     </section>
 
     <div class="section-divider"></div>
 
     <!-- ─── NEWSLETTER ────────────────────────────────────────────────────── -->
-    <section id="newsletter" style="padding:100px 40px;background:var(--navy);position:relative;overflow:hidden;">
+    <section id="newsletter" style="display:none;padding:100px 40px;background:var(--navy);position:relative;overflow:hidden;">
         <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%, rgba(255,0,0,0.06) 0%, transparent 70%);pointer-events:none;"></div>
         <div style="max-width:640px;margin:0 auto;text-align:center;position:relative;" class="reveal">
             <div class="font-mono text-muted" style="font-size:11px;letter-spacing:0.2em;margin-bottom:16px;">EXCLUSIVE ACCESS</div>
@@ -806,12 +815,12 @@
                 if (siteSettings.hero_title) { const el = document.getElementById('hero-title-text'); el.textContent = siteSettings.hero_title; el.dataset.text = siteSettings.hero_title; }
                 if (siteSettings.hero_subtitle) document.getElementById('hero-subtitle-text').textContent = siteSettings.hero_subtitle;
                 if (siteSettings.hero_cta_text) document.getElementById('hero-cta-btn').textContent = siteSettings.hero_cta_text;
-                if (siteSettings.contact_email) document.getElementById('contact-email-btn').href = 'mailto:' + siteSettings.contact_email;
+                // contact-email-btn now goes to /contact page — no override needed
                 if (siteSettings.free_shipping_threshold && parseFloat(siteSettings.free_shipping_threshold) > 0) { window.FREE_SHIPPING_THRESHOLD = parseFloat(siteSettings.free_shipping_threshold); }
                 if (siteSettings.low_stock_threshold) { window.LOW_STACK_THRESHOLD = parseInt(siteSettings.low_stock_threshold) || 10; }
-                // Newsletter section
+                // Newsletter section — hidden by default, only show if explicitly enabled
                 const nlSec = document.getElementById('newsletter');
-                if (nlSec && siteSettings.newsletter_enabled === 'false') nlSec.style.display = 'none';
+                if (nlSec && siteSettings.newsletter_enabled === 'true') nlSec.style.display = 'block';
                 if (siteSettings.newsletter_title) { const el = document.getElementById('newsletter-title'); if (el) el.innerHTML = siteSettings.newsletter_title.replace(/\|(\S[^|]*)/g, '<span class="text-red">$1</span>'); }
                 if (siteSettings.newsletter_subtitle) { const el = document.getElementById('newsletter-subtitle'); if (el) el.textContent = siteSettings.newsletter_subtitle; }
                 // Announcement banner
@@ -1092,7 +1101,7 @@
         }
 
         function openProductDetail(productId) {
-            const p = allProducts.find(x => x.id === productId);
+            const p = products.find(x => x.id === productId);
             if (!p) return;
             const modal = document.getElementById('product-detail-modal');
             const hasSale = p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price);

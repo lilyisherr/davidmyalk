@@ -767,6 +767,19 @@ app.patch('/api/user/addresses/:id/default', requireAuth, async (req, res) => {
     } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.get('/api/store-stats', async (req, res) => {
+    try {
+        const [shippedRes, productsRes] = await Promise.all([
+            pool.query("SELECT COUNT(*) FROM orders WHERE status IN ('shipped','delivered')"),
+            pool.query("SELECT COUNT(*) FROM products WHERE is_active = true")
+        ]);
+        res.json({
+            ordersShipped: parseInt(shippedRes.rows[0].count) || 0,
+            activeProducts: parseInt(productsRes.rows[0].count) || 0
+        });
+    } catch { res.status(500).json({ ordersShipped: 0, activeProducts: 0 }); }
+});
+
 app.get('/api/user/stats', requireAuth, async (req, res) => {
     try {
         const [ordersCount, totalSpent, userData] = await Promise.all([
