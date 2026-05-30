@@ -34,7 +34,7 @@ function renderNav(currentUser, options = {}) {
 
     const shopHref = isStore ? '#shop' : '/#shop';
     const aboutHref = isStore ? '#about' : '/#about';
-    const contactHref = isStore ? '#contact' : '/#contact';
+    const contactHref = '/contact';
 
     container.innerHTML = `
         <nav class="nav-auth">
@@ -115,7 +115,8 @@ async function renderFooter() {
                     <div>
                         <div class="footer-col-title">Company</div>
                         <a href="/#about" class="footer-link">About Us</a>
-                        <a href="/#contact" class="footer-link">Contact</a>
+                        <a href="/contact" class="footer-link">Contact</a>
+                        <a href="/tracking" class="footer-link">Track Order</a>
                         ${socialLinksHTML}
                     </div>
                     <div>

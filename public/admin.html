@@ -287,6 +287,14 @@
                 <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                 Discounts
             </a>
+            <a href="#" class="sidebar-link" onclick="showSection('reviews')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Reviews
+            </a>
+            <a href="#" class="sidebar-link" onclick="showSection('contacts')">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Contact Inbox
+            </a>
             <a href="#" class="sidebar-link" onclick="showSection('settings')">
                 <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 Settings
@@ -513,6 +521,68 @@
                         </thead>
                         <tbody id="discounts-table"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- REVIEWS SECTION -->
+            <div id="reviews-section" style="display:none;">
+                <div class="admin-header">
+                    <div>
+                        <h2 class="admin-title">CUSTOMER <span class="text-red">REVIEWS</span></h2>
+                        <p class="admin-subtitle">Manage testimonials shown on the storefront</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openReviewModal()">+ ADD REVIEW</button>
+                </div>
+                <div class="font-mono text-muted" style="font-size:11px;margin-bottom:20px;padding:12px 16px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);">Only approved reviews appear on the storefront. Use this to add real reviews you've collected or approve/reject submissions.</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Reviewer</th><th>Rating</th><th>Review</th><th>Status</th><th>Date</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="reviews-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CONTACT INBOX SECTION -->
+            <div id="contacts-section" style="display:none;">
+                <div class="admin-header">
+                    <div>
+                        <h2 class="admin-title">CONTACT <span class="text-red">INBOX</span></h2>
+                        <p class="admin-subtitle">Messages submitted through the contact form</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadContacts()">REFRESH</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Date</th><th>Name</th><th>Email</th><th>Subject</th><th>Order #</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="contacts-table"></tbody>
+                    </table>
+                </div>
+                <!-- Contact detail panel -->
+                <div id="contact-detail-panel" style="display:none;margin-top:24px;padding:24px;background:rgba(255,255,255,0.02);border:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                        <div>
+                            <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;margin-bottom:4px;">MESSAGE FROM</div>
+                            <div id="cd-name" style="font-size:16px;font-weight:600;"></div>
+                            <div id="cd-email" class="font-mono text-muted" style="font-size:12px;"></div>
+                        </div>
+                        <button onclick="document.getElementById('contact-detail-panel').style.display='none'" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;">&#10005;</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div><div class="font-mono text-muted" style="font-size:10px;">SUBJECT</div><div id="cd-subject" style="font-size:13px;margin-top:4px;"></div></div>
+                        <div><div class="font-mono text-muted" style="font-size:10px;">ORDER</div><div id="cd-order" style="font-size:13px;margin-top:4px;"></div></div>
+                    </div>
+                    <div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:2px;white-space:pre-wrap;font-size:13px;line-height:1.7;" id="cd-message"></div>
+                    <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+                        <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.1em;">MARK AS:</div>
+                        <button onclick="markContact(window._cdId,'new')" class="btn btn-secondary btn-sm" style="font-size:10px;">NEW</button>
+                        <button onclick="markContact(window._cdId,'read')" class="btn btn-secondary btn-sm" style="font-size:10px;">READ</button>
+                        <button onclick="markContact(window._cdId,'replied')" class="btn btn-primary btn-sm" style="font-size:10px;">REPLIED</button>
+                        <a id="cd-mailto" href="#" class="btn btn-secondary btn-sm" style="font-size:10px;">REPLY BY EMAIL ↗</a>
+                    </div>
                 </div>
             </div>
 
@@ -786,9 +856,10 @@
 
                 <!-- NOTIFICATIONS TAB -->
                 <div class="settings-panel" id="stab-notifications" style="display:none;">
+                    <!-- Admin alerts -->
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">ADMIN <span class="text-red">ALERTS</span></h3>
-                        <p class="settings-card-desc">Get notified when something important happens in your store. Note: email delivery requires an email service — these settings control preferences for when email is set up.</p>
+                        <p class="settings-card-desc">Get notified when something important happens in your store.</p>
                         <div class="mb-4">
                             <label class="input-label">YOUR EMAIL FOR NOTIFICATIONS</label>
                             <input type="email" class="input-field" id="set-admin_notification_email" placeholder="you@example.com">
@@ -806,37 +877,87 @@
                                 <input type="checkbox" id="set-low_stock_alert_enabled" style="accent-color:var(--primary);width:20px;height:20px;" checked>
                                 <span class="font-mono text-xs">LOW STOCK ALERTS</span>
                             </label>
-                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">Get notified when a product's stock drops to the low-stock warning level (set in Advanced)</span>
+                            <span class="font-mono text-xs text-muted" style="margin-left:30px;">Get notified when a product's stock drops to the low-stock warning level</span>
                         </div>
                         <button class="btn btn-primary" onclick="saveBulkSettings(['admin_notification_email','order_notification_enabled','low_stock_alert_enabled'])">SAVE</button>
                     </div>
+
+                    <!-- SMTP Settings -->
                     <div class="card" style="max-width:700px;margin-top:24px;">
-                        <h3 class="settings-card-title">CUSTOMER <span class="text-red">EMAILS</span></h3>
-                        <p class="settings-card-desc">Emails sent to customers automatically.</p>
-                        <div style="padding:14px;border:1px solid rgba(99,102,241,0.3);border-radius:8px;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                                <div>
-                                    <div class="font-mono text-xs" style="font-weight:600;">ORDER CONFIRMATION</div>
-                                    <div class="font-mono text-xs text-muted">Sent to customer right after they place an order</div>
-                                </div>
-                                <span class="badge badge-active">AUTO</span>
-                            </div>
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                                <div>
-                                    <div class="font-mono text-xs" style="font-weight:600;">SHIPPING UPDATE</div>
-                                    <div class="font-mono text-xs text-muted">Sent when you add a tracking number to an order</div>
-                                </div>
-                                <span class="badge badge-active">AUTO</span>
-                            </div>
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <div class="font-mono text-xs" style="font-weight:600;">ACCOUNT WELCOME</div>
-                                    <div class="font-mono text-xs text-muted">Sent when a new customer creates an account</div>
-                                </div>
-                                <span class="badge badge-active">AUTO</span>
-                            </div>
+                        <h3 class="settings-card-title">EMAIL / <span class="text-red">SMTP</span></h3>
+                        <p class="settings-card-desc">Connect your email provider to send order confirmations, shipping updates, and contact form emails automatically. Works with Gmail, SendGrid, Mailgun, Postmark, etc.</p>
+                        <div class="grid-2 mb-4">
+                            <div><label class="input-label">SMTP HOST</label><input type="text" class="input-field" id="set-smtp_host" placeholder="smtp.gmail.com"></div>
+                            <div><label class="input-label">SMTP PORT</label><input type="number" class="input-field" id="set-smtp_port" placeholder="587"></div>
                         </div>
-                        <p class="font-mono text-xs text-muted" style="margin-top:10px;">Email delivery requires a transactional email service (e.g. SendGrid, Mailgun). Contact support to set this up.</p>
+                        <div class="grid-2 mb-4">
+                            <div><label class="input-label">USERNAME / EMAIL</label><input type="text" class="input-field" id="set-smtp_user" placeholder="you@example.com"></div>
+                            <div><label class="input-label">PASSWORD / API KEY</label><input type="password" class="input-field" id="set-smtp_pass" placeholder="••••••••••••••"></div>
+                        </div>
+                        <div class="grid-2 mb-4">
+                            <div><label class="input-label">FROM NAME</label><input type="text" class="input-field" id="set-smtp_from_name" placeholder="David Myalik Store"></div>
+                            <div><label class="input-label">FROM EMAIL</label><input type="email" class="input-field" id="set-smtp_from_email" placeholder="noreply@davidmyalik.com"></div>
+                        </div>
+                        <div class="mb-4">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="set-smtp_secure" style="accent-color:var(--primary);width:16px;height:16px;">
+                                <span class="font-mono text-xs">USE SSL (port 465) — uncheck for TLS (port 587)</span>
+                            </label>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">CONTACT FORM ROUTING EMAIL</label>
+                            <input type="email" class="input-field" id="set-contact_form_email" placeholder="you@example.com">
+                            <span class="font-mono text-xs text-muted">Contact form submissions will be emailed here</span>
+                        </div>
+                        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                            <button class="btn btn-primary" onclick="saveEmailSettings()">SAVE SMTP SETTINGS</button>
+                            <button class="btn btn-secondary" onclick="sendTestEmail()">SEND TEST EMAIL</button>
+                            <div id="smtp-test-status" class="font-mono text-xs text-muted"></div>
+                        </div>
+                    </div>
+
+                    <!-- Email Templates -->
+                    <div class="card" style="max-width:700px;margin-top:24px;">
+                        <h3 class="settings-card-title">EMAIL <span class="text-red">TEMPLATES</span></h3>
+                        <p class="settings-card-desc">Customize emails sent to customers. Use variables: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{customer_name}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{order_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{total}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_url}}</code></p>
+
+                        <!-- Order Confirmation -->
+                        <div style="border:1px solid var(--border);padding:16px;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <div class="font-mono text-xs" style="font-weight:700;">ORDER CONFIRMATION</div>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="set-email_order_confirmation_enabled" style="accent-color:var(--primary);">
+                                    <span class="font-mono text-xs text-muted">ENABLED</span>
+                                </label>
+                            </div>
+                            <div class="mb-3"><label class="input-label">SUBJECT</label><input type="text" class="input-field" id="set-email_order_confirmation_subject"></div>
+                            <div><label class="input-label">BODY</label><textarea class="input-field" id="set-email_order_confirmation_body" style="min-height:90px;font-family:var(--font-mono);font-size:11px;"></textarea></div>
+                        </div>
+                        <!-- Order Shipped -->
+                        <div style="border:1px solid var(--border);padding:16px;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <div class="font-mono text-xs" style="font-weight:700;">ORDER SHIPPED</div>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="set-email_order_shipped_enabled" style="accent-color:var(--primary);">
+                                    <span class="font-mono text-xs text-muted">ENABLED</span>
+                                </label>
+                            </div>
+                            <div class="mb-3"><label class="input-label">SUBJECT</label><input type="text" class="input-field" id="set-email_order_shipped_subject"></div>
+                            <div><label class="input-label">BODY</label><textarea class="input-field" id="set-email_order_shipped_body" style="min-height:90px;font-family:var(--font-mono);font-size:11px;"></textarea></div>
+                        </div>
+                        <!-- Contact Auto-Reply -->
+                        <div style="border:1px solid var(--border);padding:16px;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <div class="font-mono text-xs" style="font-weight:700;">CONTACT FORM AUTO-REPLY</div>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="set-email_contact_auto_reply_enabled" style="accent-color:var(--primary);">
+                                    <span class="font-mono text-xs text-muted">ENABLED</span>
+                                </label>
+                            </div>
+                            <div class="mb-3"><label class="input-label">SUBJECT</label><input type="text" class="input-field" id="set-email_contact_auto_reply_subject"></div>
+                            <div><label class="input-label">BODY (variables: {{customer_name}}, {{subject}})</label><textarea class="input-field" id="set-email_contact_auto_reply_body" style="min-height:90px;font-family:var(--font-mono);font-size:11px;"></textarea></div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveEmailTemplates()">SAVE TEMPLATES</button>
                     </div>
                 </div>
 
@@ -1295,6 +1416,11 @@
                     </div>
                     <input type="hidden" id="prod-image-final">
                 </div>
+                <div class="mb-4">
+                    <label class="input-label">EXTRA IMAGES <span style="color:var(--text-muted);font-size:9px;">OPTIONAL — FOR PRODUCT GALLERY</span></label>
+                    <div id="extra-images-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    <button type="button" onclick="addExtraImageField()" style="background:none;border:1px dashed var(--border);color:var(--text-muted);font-family:var(--font-mono);font-size:10px;padding:8px 14px;cursor:pointer;width:100%;margin-top:8px;transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='white'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">+ ADD IMAGE URL</button>
+                </div>
                 <button type="submit" class="btn btn-primary btn-full" id="prod-submit-btn">SAVE PRODUCT</button>
             </form>
         </div>
@@ -1320,6 +1446,40 @@
         </div>
     </div>
 
+    <!-- Review Modal -->
+    <div class="modal-overlay" id="review-modal" style="display:none;align-items:center;justify-content:center;">
+        <div class="modal" style="max-width:560px;">
+            <div class="flex-between mb-6">
+                <h3 style="font-size:18px;" id="rm-title">ADD <span class="text-red">REVIEW</span></h3>
+                <button onclick="closeReviewModal()" style="background:none;border:none;color:white;cursor:pointer;font-size:20px;">&#10005;</button>
+            </div>
+            <div class="mb-4"><label class="input-label">REVIEWER NAME</label><input type="text" class="input-field" id="rm-name" placeholder="Jake K."></div>
+            <div class="mb-4"><label class="input-label">LOCATION / TAG <span style="color:var(--text-muted);font-size:9px;">OPTIONAL</span></label><input type="text" class="input-field" id="rm-location" placeholder="S14 OWNER · OHIO"></div>
+            <div class="mb-4">
+                <label class="input-label">RATING</label>
+                <select class="input-field" id="rm-rating">
+                    <option value="5">★★★★★ — 5 Stars</option>
+                    <option value="4">★★★★☆ — 4 Stars</option>
+                    <option value="3">★★★☆☆ — 3 Stars</option>
+                    <option value="2">★★☆☆☆ — 2 Stars</option>
+                    <option value="1">★☆☆☆☆ — 1 Star</option>
+                </select>
+            </div>
+            <div class="mb-4"><label class="input-label">REVIEW TEXT</label><textarea class="input-field" id="rm-text" style="min-height:100px;" placeholder="What did they say about the product?"></textarea></div>
+            <div class="mb-4">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="rm-approved" style="accent-color:var(--primary);width:16px;height:16px;" checked>
+                    <span class="font-mono text-xs">APPROVED — Show on storefront immediately</span>
+                </label>
+            </div>
+            <div id="rm-status" class="font-mono text-xs" style="min-height:16px;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" id="rm-save-btn" onclick="saveReview()">SAVE REVIEW</button>
+                <button class="btn btn-secondary" onclick="closeReviewModal()">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -1330,7 +1490,7 @@
         let categories = [];
         let imageMode = 'upload';
         let uploadedImageUrl = '';
-        const sections = ['overview', 'products', 'orders', 'users', 'logs', 'discounts', 'settings'];
+        const sections = ['overview', 'products', 'orders', 'users', 'logs', 'discounts', 'reviews', 'contacts', 'settings'];
 
         async function init() {
             const res = await fetch('/api/auth/me');
@@ -1365,6 +1525,171 @@
 
         async function loadAll() {
             await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts(), loadRevenueChart(7), loadTopProducts()]);
+        }
+
+        // ─── EXTRA IMAGES ─────────────────────────────────────────────────────
+        function addExtraImageField(value = '') {
+            const list = document.getElementById('extra-images-list');
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+            row.innerHTML = `<input type="url" class="input-field" value="${value}" placeholder="https://example.com/extra.jpg" style="flex:1;">
+                <button type="button" onclick="this.parentElement.remove()" style="background:none;border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-family:var(--font-mono);font-size:11px;padding:8px 12px;cursor:pointer;">✕</button>`;
+            list.appendChild(row);
+        }
+
+        function getExtraImages() {
+            return Array.from(document.querySelectorAll('#extra-images-list input')).map(i => i.value.trim()).filter(Boolean);
+        }
+
+        function clearExtraImages() {
+            document.getElementById('extra-images-list').innerHTML = '';
+        }
+
+        // ─── REVIEWS ─────────────────────────────────────────────────────────
+        let allReviews = [];
+        let editingReviewId = null;
+
+        async function loadReviews() {
+            try {
+                const res = await fetch('/api/admin/reviews');
+                allReviews = await res.json();
+                renderReviewsTable();
+            } catch {}
+        }
+
+        function renderReviewsTable() {
+            const tbody = document.getElementById('reviews-table');
+            if (!tbody) return;
+            if (!allReviews.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:12px;">No reviews yet. Add your first review above.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = allReviews.map(r => {
+                const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                const statusBadge = r.is_approved
+                    ? '<span class="badge badge-active">APPROVED</span>'
+                    : '<span class="badge badge-inactive">HIDDEN</span>';
+                return `<tr>
+                    <td><div style="font-size:13px;font-weight:600;">${r.reviewer_name}</div>${r.reviewer_location ? `<div class="font-mono text-muted" style="font-size:10px;">${r.reviewer_location}</div>` : ''}</td>
+                    <td><span style="color:#f59e0b;">${stars}</span></td>
+                    <td style="max-width:260px;"><div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.review_text}</div></td>
+                    <td>${statusBadge}</td>
+                    <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(r.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <button onclick="toggleReviewApproval(${r.id},${!r.is_approved})" class="btn btn-secondary btn-sm" style="font-size:10px;">${r.is_approved ? 'HIDE' : 'APPROVE'}</button>
+                            <button onclick="openReviewModal(${r.id})" class="btn btn-secondary btn-sm" style="font-size:10px;">EDIT</button>
+                            <button onclick="deleteReview(${r.id})" class="btn btn-sm" style="font-size:10px;border:1px solid rgba(239,68,68,0.3);color:#ef4444;background:none;">DEL</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function openReviewModal(id) {
+            const review = id ? allReviews.find(r => r.id === id) : null;
+            editingReviewId = id || null;
+            const modal = document.getElementById('review-modal');
+            if (!modal) return;
+            document.getElementById('rm-title').textContent = review ? 'EDIT REVIEW' : 'ADD REVIEW';
+            document.getElementById('rm-name').value = review?.reviewer_name || '';
+            document.getElementById('rm-location').value = review?.reviewer_location || '';
+            document.getElementById('rm-rating').value = review?.rating || 5;
+            document.getElementById('rm-text').value = review?.review_text || '';
+            document.getElementById('rm-approved').checked = review?.is_approved ?? true;
+            document.getElementById('rm-status').textContent = '';
+            modal.style.display = 'flex';
+        }
+
+        function closeReviewModal() { document.getElementById('review-modal').style.display = 'none'; }
+
+        async function saveReview() {
+            const btn = document.getElementById('rm-save-btn');
+            const status = document.getElementById('rm-status');
+            const body = {
+                reviewer_name: document.getElementById('rm-name').value.trim(),
+                reviewer_location: document.getElementById('rm-location').value.trim(),
+                rating: parseInt(document.getElementById('rm-rating').value),
+                review_text: document.getElementById('rm-text').value.trim(),
+                is_approved: document.getElementById('rm-approved').checked
+            };
+            if (!body.reviewer_name || !body.review_text) { status.textContent = 'Name and review text required.'; status.style.color = '#ef4444'; return; }
+            btn.disabled = true; btn.textContent = 'SAVING...';
+            try {
+                const url = editingReviewId ? `/api/admin/reviews/${editingReviewId}` : '/api/admin/reviews';
+                const method = editingReviewId ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                if (res.ok) { closeReviewModal(); await loadReviews(); showToast('Review saved!', 'success'); }
+                else { const d = await res.json(); status.textContent = d.error || 'Failed'; status.style.color = '#ef4444'; }
+            } catch { status.textContent = 'Error saving.'; status.style.color = '#ef4444'; }
+            finally { btn.disabled = false; btn.textContent = 'SAVE REVIEW'; }
+        }
+
+        async function toggleReviewApproval(id, approved) {
+            await fetch(`/api/admin/reviews/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...allReviews.find(r=>r.id===id), is_approved: approved }) });
+            await loadReviews();
+            showToast(approved ? 'Review approved — now visible on store' : 'Review hidden from store', 'success');
+        }
+
+        async function deleteReview(id) {
+            if (!confirm('Delete this review permanently?')) return;
+            await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' });
+            await loadReviews();
+            showToast('Review deleted', 'success');
+        }
+
+        // ─── CONTACTS ────────────────────────────────────────────────────────
+        let allContacts = [];
+
+        async function loadContacts() {
+            try {
+                const res = await fetch('/api/admin/contact-submissions');
+                allContacts = await res.json();
+                renderContactsTable();
+            } catch {}
+        }
+
+        function renderContactsTable() {
+            const tbody = document.getElementById('contacts-table');
+            if (!tbody) return;
+            if (!allContacts.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:12px;">No contact submissions yet.</td></tr>';
+                return;
+            }
+            const statusColors = { new: '#ef4444', read: '#f59e0b', replied: '#22c55e' };
+            tbody.innerHTML = allContacts.map(c => {
+                const sc = statusColors[c.status] || '#888';
+                return `<tr style="${c.status === 'new' ? 'background:rgba(255,0,0,0.03);' : ''}">
+                    <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(c.created_at).toLocaleDateString()}</td>
+                    <td style="font-size:13px;font-weight:${c.status==='new'?'700':'400'};">${c.name}</td>
+                    <td><a href="mailto:${c.email}" class="font-mono" style="font-size:11px;color:var(--primary);">${c.email}</a></td>
+                    <td style="font-size:12px;">${c.subject || '—'}</td>
+                    <td class="font-mono" style="font-size:11px;">${c.order_number || '—'}</td>
+                    <td><span class="font-mono" style="font-size:10px;color:${sc};text-transform:uppercase;">${c.status}</span></td>
+                    <td><button onclick="viewContact(${c.id})" class="btn btn-secondary btn-sm" style="font-size:10px;">VIEW</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function viewContact(id) {
+            const c = allContacts.find(x => x.id === id);
+            if (!c) return;
+            window._cdId = id;
+            document.getElementById('cd-name').textContent = c.name;
+            document.getElementById('cd-email').textContent = c.email;
+            document.getElementById('cd-subject').textContent = c.subject || '—';
+            document.getElementById('cd-order').textContent = c.order_number || '—';
+            document.getElementById('cd-message').textContent = c.message;
+            document.getElementById('cd-mailto').href = `mailto:${c.email}?subject=Re: ${encodeURIComponent(c.subject || 'Your message')}&body=Hi ${encodeURIComponent(c.name)},\n\n`;
+            document.getElementById('contact-detail-panel').style.display = 'block';
+            document.getElementById('contact-detail-panel').scrollIntoView({ behavior: 'smooth' });
+            if (c.status === 'new') markContact(id, 'read');
+        }
+
+        async function markContact(id, status) {
+            await fetch(`/api/admin/contact-submissions/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+            await loadContacts();
+            showToast('Status updated', 'success');
         }
 
         let allLogs = [];
@@ -1496,14 +1821,23 @@
                 // Storefront sections
                 'featured_collection_title','featured_collection_subtitle',
                 'newsletter_title','newsletter_subtitle',
-                'about_title','about_text','about_image'
+                'about_title','about_text','about_image',
+                // SMTP
+                'smtp_host','smtp_port','smtp_user','smtp_from_name','smtp_from_email','contact_form_email',
+                // Email templates
+                'email_order_confirmation_subject','email_order_confirmation_body',
+                'email_order_shipped_subject','email_order_shipped_body',
+                'email_contact_auto_reply_subject','email_contact_auto_reply_body'
             ];
             const checkFields = [
                 'tax_enabled','checkout_terms_enabled','guest_checkout_enabled',
                 'maintenance_mode','banner_enabled',
                 'order_notification_enabled','low_stock_alert_enabled',
                 'show_out_of_stock_products','auto_reduce_stock',
-                'auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers'
+                'auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers',
+                // SMTP + Templates
+                'smtp_secure',
+                'email_order_confirmation_enabled','email_order_shipped_enabled','email_contact_auto_reply_enabled'
             ];
             for (const key of textFields) {
                 const el = document.getElementById('set-' + key);
@@ -1517,6 +1851,68 @@
                     el.checked = allSiteSettings[key] === 'true' || allSiteSettings[key] === true;
                 }
             }
+        }
+
+        // ─── EMAIL SETTINGS FUNCTIONS ────────────────────────────────────────
+        async function saveEmailSettings() {
+            const smtpKeys = ['smtp_host','smtp_port','smtp_user','smtp_from_name','smtp_from_email','contact_form_email'];
+            const smtpCheckKeys = ['smtp_secure'];
+            const settings = {};
+            smtpKeys.forEach(k => {
+                const el = document.getElementById('set-' + k);
+                if (el) settings[k] = el.value;
+            });
+            smtpCheckKeys.forEach(k => {
+                const el = document.getElementById('set-' + k);
+                if (el) settings[k] = el.checked ? 'true' : 'false';
+            });
+            // Handle password separately — only save if user typed something
+            const passEl = document.getElementById('set-smtp_pass');
+            if (passEl && passEl.value && passEl.value !== '••••••••••••••') {
+                settings['smtp_pass'] = passEl.value;
+            }
+            try {
+                const res = await fetch('/api/admin/settings/bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ settings }) });
+                if (res.ok) { showToast('SMTP settings saved!', 'success'); Object.assign(allSiteSettings, settings); }
+                else showToast('Failed to save', 'error');
+            } catch { showToast('Failed to save', 'error'); }
+        }
+
+        async function sendTestEmail() {
+            const status = document.getElementById('smtp-test-status');
+            status.textContent = 'Sending...';
+            try {
+                const res = await fetch('/api/admin/email/test', { method:'POST' });
+                const data = await res.json();
+                if (res.ok) { status.textContent = '✓ Test email sent!'; status.style.color = '#22c55e'; }
+                else { status.textContent = '✕ ' + (data.error || 'Failed'); status.style.color = '#ef4444'; }
+            } catch { status.textContent = '✕ Network error'; status.style.color = '#ef4444'; }
+            setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 5000);
+        }
+
+        async function saveEmailTemplates() {
+            const templateKeys = [
+                'email_order_confirmation_subject','email_order_confirmation_body',
+                'email_order_shipped_subject','email_order_shipped_body',
+                'email_contact_auto_reply_subject','email_contact_auto_reply_body'
+            ];
+            const templateCheckKeys = [
+                'email_order_confirmation_enabled','email_order_shipped_enabled','email_contact_auto_reply_enabled'
+            ];
+            const settings = {};
+            templateKeys.forEach(k => {
+                const el = document.getElementById('set-' + k);
+                if (el) settings[k] = el.value;
+            });
+            templateCheckKeys.forEach(k => {
+                const el = document.getElementById('set-' + k);
+                if (el) settings[k] = el.checked ? 'true' : 'false';
+            });
+            try {
+                const res = await fetch('/api/admin/settings/bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ settings }) });
+                if (res.ok) { showToast('Email templates saved!', 'success'); Object.assign(allSiteSettings, settings); }
+                else showToast('Failed to save', 'error');
+            } catch { showToast('Failed to save', 'error'); }
         }
 
         async function checkStripeStatus() {
@@ -1858,6 +2254,9 @@
                 const btn = document.getElementById('mbn-' + s);
                 if (btn) btn.classList.toggle('active', s === name);
             });
+            // Lazy-load reviews and contacts on first visit
+            if (name === 'reviews') loadReviews();
+            if (name === 'contacts') loadContacts();
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -2172,6 +2571,7 @@
             document.getElementById('product-modal-title').innerHTML = 'ADD <span class="text-red">PRODUCT</span>';
             document.getElementById('prod-category-custom').style.display = 'none';
             document.getElementById('custom-cat-toggle').textContent = '+ Custom Category';
+            clearExtraImages();
             document.getElementById('product-modal').classList.add('open');
         }
         function closeProductModal() { document.getElementById('product-modal').classList.remove('open'); }
@@ -2288,6 +2688,12 @@
                 resetUploadArea();
             }
 
+            // Load extra images
+            clearExtraImages();
+            let extraImgs = [];
+            try { extraImgs = typeof p.product_images === 'string' ? JSON.parse(p.product_images) : (Array.isArray(p.product_images) ? p.product_images : []); } catch {}
+            extraImgs.filter(Boolean).forEach(url => addExtraImageField(url));
+
             document.getElementById('product-modal-title').innerHTML = 'EDIT <span class="text-red">PRODUCT</span>';
             document.getElementById('product-modal').classList.add('open');
         }
@@ -2314,7 +2720,8 @@
                 stock: document.getElementById('prod-stock').value,
                 category: category,
                 isActive: document.getElementById('prod-active').value === 'true',
-                imageUrl: imageUrl
+                imageUrl: imageUrl,
+                productImages: getExtraImages()
             };
             const url = id ? `/api/admin/products/${id}` : '/api/admin/products';
             const method = id ? 'PUT' : 'POST';

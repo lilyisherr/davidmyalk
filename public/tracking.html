@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Your Order | DAVID MYALIK</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { background: var(--navy); min-height: 100vh; display: flex; flex-direction: column; }
+        .tracking-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 120px 20px 60px; }
+        .tracking-box { width: 100%; max-width: 600px; }
+        .tracking-title { font-family: var(--font-display); font-size: clamp(36px, 7vw, 72px); line-height: 1; margin-bottom: 8px; }
+        .status-timeline { display: flex; flex-direction: column; gap: 0; margin-top: 32px; }
+        .status-step { display: flex; gap: 20px; position: relative; }
+        .status-step:not(:last-child)::after { content: ''; position: absolute; left: 15px; top: 36px; width: 2px; height: calc(100% - 4px); background: var(--border); }
+        .step-icon { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; background: var(--navy); }
+        .step-icon.done { border-color: #22c55e; background: rgba(34,197,94,0.15); }
+        .step-icon.active { border-color: var(--primary); background: rgba(255,0,0,0.1); }
+        .step-body { padding-bottom: 28px; flex: 1; }
+        .step-label { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; }
+        .step-label.done { color: #22c55e; }
+        .step-label.active { color: var(--primary); }
+        .step-label.pending { color: var(--text-muted); }
+        .step-desc { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-family: var(--font-mono); }
+        .order-items-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+        .order-item-row { display: flex; gap: 12px; align-items: center; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div id="site-nav"></div>
+
+    <div class="tracking-wrap">
+        <div class="tracking-box">
+            <div class="font-mono text-muted" style="font-size:11px;letter-spacing:0.2em;margin-bottom:12px;">ORDER TRACKING</div>
+            <h1 class="tracking-title">TRACK YOUR <span class="text-red">ORDER</span></h1>
+            <p class="font-mono text-muted" style="font-size:12px;margin-top:12px;margin-bottom:40px;">Enter your order number to check the status of your shipment.</p>
+
+            <div style="display:flex;gap:0;margin-bottom:40px;">
+                <input type="text" id="track-input" placeholder="e.g. DM-0001" class="input-field"
+                    style="flex:1;text-transform:uppercase;letter-spacing:0.1em;border-right:none;"
+                    oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')trackOrder()">
+                <button onclick="trackOrder()" class="btn btn-primary" style="padding:14px 28px;font-size:12px;letter-spacing:0.15em;">TRACK</button>
+            </div>
+
+            <div id="track-result"></div>
+        </div>
+    </div>
+
+    <div id="site-footer"></div>
+    <div class="toast-container" id="toast-container"></div>
+    <script src="/js/components.js"></script>
+    <script>
+        const STATUS_STEPS = [
+            { key: 'pending_payment',  label: 'PAYMENT PENDING',   desc: 'Awaiting payment confirmation' },
+            { key: 'pending',          label: 'ORDER PLACED',       desc: 'We received your order and are getting it ready' },
+            { key: 'processing',       label: 'PROCESSING',         desc: 'Your order is being prepared for shipment' },
+            { key: 'shipped',          label: 'SHIPPED',            desc: 'Your order is on its way' },
+            { key: 'delivered',        label: 'DELIVERED',          desc: 'Your order has been delivered' },
+        ];
+        const STATUS_ORDER = ['pending_payment','pending','processing','shipped','delivered'];
+
+        async function init() {
+            const res = await fetch('/api/auth/me').catch(() => null);
+            const data = res ? await res.json().catch(() => ({})) : {};
+            renderNav(data.user || null, { isStore: false });
+            renderFooter();
+
+            const params = new URLSearchParams(window.location.search);
+            const orderNum = params.get('order');
+            if (orderNum) {
+                document.getElementById('track-input').value = orderNum.toUpperCase();
+                trackOrder();
+            }
+        }
+
+        async function trackOrder() {
+            const num = document.getElementById('track-input').value.trim();
+            const el = document.getElementById('track-result');
+            if (!num) { el.innerHTML = '<p class="font-mono text-muted" style="font-size:12px;">Please enter an order number.</p>'; return; }
+            el.innerHTML = '<p class="font-mono text-muted" style="font-size:12px;letter-spacing:0.1em;">LOOKING UP ORDER...</p>';
+            try {
+                const res = await fetch('/api/order-tracking/' + encodeURIComponent(num));
+                if (!res.ok) { el.innerHTML = `<div style="padding:24px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);"><span class="font-mono text-xs" style="color:#ef4444;">ORDER NOT FOUND</span><p class="font-mono text-muted" style="font-size:11px;margin-top:8px;">No order found with number <strong style="color:var(--text);">${num}</strong>. Double-check your order number and try again.</p></div>`; return; }
+                const order = await res.json();
+                renderResult(order);
+            } catch {
+                el.innerHTML = '<p class="font-mono text-muted" style="font-size:12px;">Could not connect. Please try again.</p>';
+            }
+        }
+
+        function renderResult(order) {
+            const el = document.getElementById('track-result');
+            const currentIdx = STATUS_ORDER.indexOf(order.status);
+            const cancelled = order.status === 'cancelled';
+
+            const carrierLinks = {
+                usps: 'https://tools.usps.com/go/TrackConfirmAction?tRef=fullpage&tLc=2&text28777=&tLabels=',
+                ups: 'https://www.ups.com/track?tracknum=',
+                fedex: 'https://www.fedex.com/fedextrack/?trknbr=',
+                dhl: 'https://www.dhl.com/en/express/tracking.html?AWB='
+            };
+            const carrier = (order.shipping_carrier || '').toLowerCase();
+            const trackingLink = order.tracking_number && carrierLinks[carrier]
+                ? `${carrierLinks[carrier]}${order.tracking_number}`
+                : null;
+
+            const timelineHTML = cancelled
+                ? `<div style="padding:20px 24px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);margin-bottom:24px;"><span class="font-mono" style="color:#ef4444;font-size:12px;font-weight:700;">ORDER CANCELLED</span><p class="font-mono text-muted" style="font-size:11px;margin-top:6px;">This order has been cancelled. Contact us if you have questions.</p></div>`
+                : `<div class="status-timeline">${STATUS_STEPS.filter(s => s.key !== 'pending_payment').map((step, i) => {
+                    const stepIdx = STATUS_ORDER.indexOf(step.key);
+                    const isDone = stepIdx < currentIdx;
+                    const isActive = stepIdx === currentIdx;
+                    const cls = isDone ? 'done' : isActive ? 'active' : 'pending';
+                    const checkSVG = isDone ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="3"><circle cx="12" cy="12" r="3" fill="#ff0000"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>';
+                    return `<div class="status-step"><div class="step-icon ${cls}">${checkSVG}</div><div class="step-body"><div class="step-label ${cls}">${step.label}</div><div class="step-desc">${step.desc}</div></div></div>`;
+                }).join('')}</div>`;
+
+            const items = Array.isArray(order.items) ? order.items : (typeof order.items === 'string' ? JSON.parse(order.items || '[]') : []);
+            const itemsHTML = items.length ? `
+                <div style="margin-top:28px;">
+                    <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;margin-bottom:10px;">ORDER ITEMS</div>
+                    <div class="order-items-list">
+                        ${items.map(i => `<div class="order-item-row">
+                            <img src="${i.image_url || i.product_image || '/images/og-image.png'}" style="width:44px;height:44px;object-fit:cover;border:1px solid var(--border);" onerror="this.src='/images/og-image.png'">
+                            <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${i.name}</div><div class="font-mono text-muted" style="font-size:10px;">Qty: ${i.quantity || i.qty}</div></div>
+                            <div class="font-mono" style="font-size:13px;">$${parseFloat(i.price).toFixed(2)}</div>
+                        </div>`).join('')}
+                    </div>
+                </div>` : '';
+
+            const trackingHTML = order.tracking_number ? `
+                <div style="margin-top:20px;padding:14px 18px;border:1px solid rgba(34,197,94,0.25);background:rgba(34,197,94,0.05);">
+                    <div class="font-mono text-xs" style="color:#22c55e;margin-bottom:6px;">TRACKING NUMBER</div>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <span class="font-mono" style="font-size:14px;font-weight:700;">${order.tracking_number}</span>
+                        ${order.shipping_carrier ? `<span class="font-mono text-muted" style="font-size:10px;text-transform:uppercase;">${order.shipping_carrier}</span>` : ''}
+                        ${trackingLink ? `<a href="${trackingLink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px;">TRACK PACKAGE ↗</a>` : ''}
+                    </div>
+                </div>` : '';
+
+            el.innerHTML = `
+                <div style="padding:24px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                        <div>
+                            <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;">ORDER NUMBER</div>
+                            <div style="font-family:var(--font-display);font-size:24px;margin-top:2px;">${order.order_number}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;">TOTAL</div>
+                            <div style="font-family:var(--font-display);font-size:24px;color:var(--primary);margin-top:2px;">$${parseFloat(order.total).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="font-mono text-muted" style="font-size:10px;">Placed ${new Date(order.created_at).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
+                </div>
+                ${timelineHTML}
+                ${trackingHTML}
+                ${itemsHTML}
+                <div style="margin-top:28px;padding:16px;border:1px solid var(--border);background:rgba(255,255,255,0.02);">
+                    <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;margin-bottom:6px;">SHIP TO</div>
+                    <div style="font-size:13px;">${order.shipping_first_name || ''} ${order.shipping_last_name || ''}</div>
+                    <div class="font-mono text-muted" style="font-size:11px;margin-top:4px;">${order.shipping_address || ''}${order.shipping_city ? ', ' + order.shipping_city : ''}${order.shipping_state ? ' ' + order.shipping_state : ''} ${order.shipping_zip || ''}</div>
+                </div>
+                <div style="margin-top:20px;text-align:center;">
+                    <a href="/contact?subject=Order%20${encodeURIComponent(order.order_number)}" class="font-mono text-muted" style="font-size:11px;text-decoration:underline;">Need help with this order?</a>
+                </div>`;
+        }
+
+        init();
+    </script>
+</body>
+</html>

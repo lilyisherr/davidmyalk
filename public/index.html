@@ -693,43 +693,8 @@
                 <h2 style="font-size:clamp(36px,6vw,72px);font-family:var(--font-display);line-height:1;">THE <span class="text-red">PIT CREW</span></h2>
                 <p class="font-mono text-muted" style="font-size:12px;margin-top:16px;max-width:480px;margin-left:auto;margin-right:auto;">Real people, real smoke. From track days to street builds — the culture speaks for itself.</p>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;" class="reveal">
-                <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);padding:28px;position:relative;">
-                    <div style="color:#f59e0b;font-size:18px;margin-bottom:12px;">★★★★★</div>
-                    <p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);margin-bottom:20px;">"Wore the hoodie to my first drift event. Three people asked where I got it before I even got out of the car. Quality is insane."</p>
-                    <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="width:36px;height:36px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;">JK</div>
-                        <div>
-                            <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;">JAKE K.</div>
-                            <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">S14 OWNER · OHIO</div>
-                        </div>
-                    </div>
-                    <div style="position:absolute;top:20px;right:24px;font-size:48px;color:rgba(255,0,0,0.08);font-family:var(--font-display);line-height:1;">"</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);padding:28px;position:relative;">
-                    <div style="color:#f59e0b;font-size:18px;margin-bottom:12px;">★★★★★</div>
-                    <p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);margin-bottom:20px;">"Finally a brand that actually gets drift culture. This isn't just merch — it's a statement. Shipped fast, fits perfect, and the stitching is premium."</p>
-                    <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;">MT</div>
-                        <div>
-                            <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;">MITCH T.</div>
-                            <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">FC3S BUILD · TEXAS</div>
-                        </div>
-                    </div>
-                    <div style="position:absolute;top:20px;right:24px;font-size:48px;color:rgba(255,0,0,0.08);font-family:var(--font-display);line-height:1;">"</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);padding:28px;position:relative;">
-                    <div style="color:#f59e0b;font-size:18px;margin-bottom:12px;">★★★★★</div>
-                    <p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);margin-bottom:20px;">"Ordered the tee and it came in 3 days. Sizing runs true — I wear L and the L was spot on. The print quality is ridiculous. Already ordered two more."</p>
-                    <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;">AS</div>
-                        <div>
-                            <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;">ALEX S.</div>
-                            <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">JZX100 · CALIFORNIA</div>
-                        </div>
-                    </div>
-                    <div style="position:absolute;top:20px;right:24px;font-size:48px;color:rgba(255,0,0,0.08);font-family:var(--font-display);line-height:1;">"</div>
-                </div>
+            <div id="reviews-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;" class="reveal">
+                <!-- Reviews loaded from API -->
             </div>
             <!-- Stats strip -->
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:60px;" class="reveal">
@@ -1105,12 +1070,12 @@
                     : `<p class="product-price">$${displayPrice.toFixed(2)}</p>`;
                 const saleBadge = hasSale ? `<span class="sale-badge">SALE −${salePct}%</span>` : '';
                 return `
-                <div class="product-card reveal" style="position:relative;">
+                <div class="product-card reveal" style="position:relative;cursor:pointer;" onclick="openProductDetail(${p.id})">
                     <div class="product-img-wrap">
                         <img src="${p.image_url}" alt="${p.name}" loading="lazy">
                         ${isOutOfStock ? '<div class="sold-out-overlay"><span class="sold-out-label">SOLD OUT</span></div>' : `
                         <div class="product-overlay">
-                            <button onclick="addToCart(${p.id})" class="btn btn-primary btn-sm">ADD TO CART</button>
+                            <button onclick="event.stopPropagation();openProductDetail(${p.id})" class="btn btn-primary btn-sm">VIEW PRODUCT</button>
                         </div>`}
                     </div>
                     <div class="product-info">
@@ -1124,6 +1089,57 @@
             }).join('');
 
             initScrollAnimations();
+        }
+
+        function openProductDetail(productId) {
+            const p = allProducts.find(x => x.id === productId);
+            if (!p) return;
+            const modal = document.getElementById('product-detail-modal');
+            const hasSale = p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price);
+            const displayPrice = hasSale ? parseFloat(p.sale_price) : parseFloat(p.price);
+            const salePct = hasSale ? Math.round((1 - parseFloat(p.sale_price) / parseFloat(p.price)) * 100) : 0;
+            const isOutOfStock = p.stock <= 0;
+            const lowThreshold = window.LOW_STOCK_THRESHOLD || 10;
+            const images = (() => {
+                let imgs = [];
+                try { imgs = typeof p.product_images === 'string' ? JSON.parse(p.product_images) : (Array.isArray(p.product_images) ? p.product_images : []); } catch {}
+                return [p.image_url, ...imgs.filter(Boolean)].filter(Boolean);
+            })();
+
+            let currentImg = 0;
+            function renderModalImages() {
+                const main = document.getElementById('pdm-main-img');
+                const thumbs = document.getElementById('pdm-thumbs');
+                if (main) main.src = images[currentImg] || '';
+                if (thumbs) thumbs.innerHTML = images.length > 1 ? images.map((src, i) =>
+                    `<img src="${src}" onclick="window._pdmSetImg(${i})" style="width:60px;height:60px;object-fit:cover;border:2px solid ${i===currentImg?'var(--primary)':'var(--border)'};cursor:pointer;transition:border-color 0.15s;" onerror="this.style.display='none'">`
+                ).join('') : '';
+            }
+            window._pdmSetImg = function(i) { currentImg = i; renderModalImages(); };
+
+            document.getElementById('pdm-title').textContent = p.name;
+            document.getElementById('pdm-category').textContent = p.category || '';
+            document.getElementById('pdm-price').innerHTML = hasSale
+                ? `$${displayPrice.toFixed(2)} <span style="font-size:16px;text-decoration:line-through;color:var(--text-muted);font-family:var(--font-display);">$${parseFloat(p.price).toFixed(2)}</span> <span style="font-family:var(--font-mono);font-size:12px;color:var(--primary);"> −${salePct}%</span>`
+                : `$${displayPrice.toFixed(2)}`;
+            document.getElementById('pdm-desc').textContent = p.description || '';
+            const stockEl = document.getElementById('pdm-stock');
+            stockEl.innerHTML = isOutOfStock ? '<span style="color:#ef4444;" class="font-mono" style="font-size:11px;">SOLD OUT</span>'
+                : p.stock <= lowThreshold ? `<span class="font-mono" style="font-size:11px;color:#f59e0b;">ONLY ${p.stock} LEFT IN STOCK</span>`
+                : `<span class="font-mono" style="font-size:11px;color:#22c55e;">IN STOCK</span>`;
+            const addBtn = document.getElementById('pdm-add-btn');
+            addBtn.disabled = isOutOfStock;
+            addBtn.textContent = isOutOfStock ? 'SOLD OUT' : 'ADD TO CART';
+            addBtn.onclick = () => { addToCart(p.id); closeProductDetail(); };
+
+            renderModalImages();
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeProductDetail() {
+            document.getElementById('product-detail-modal').style.display = 'none';
+            document.body.style.overflow = '';
         }
 
         function initScrollAnimations() {
@@ -1477,7 +1493,75 @@
             await doLogout();
         }
 
+        async function loadReviews() {
+            try {
+                const res = await fetch('/api/reviews');
+                const reviews = await res.json();
+                const grid = document.getElementById('reviews-grid');
+                if (!grid) return;
+                if (!reviews.length) {
+                    grid.innerHTML = '<div class="font-mono text-muted" style="font-size:11px;grid-column:1/-1;text-align:center;padding:40px;">No reviews yet.</div>';
+                    return;
+                }
+                grid.innerHTML = reviews.map(r => {
+                    const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                    const initials = r.reviewer_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+                    const colors = ['var(--primary)', 'rgba(255,255,255,0.15)', 'rgba(59,130,246,0.5)'];
+                    const bg = colors[r.id % colors.length];
+                    return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);padding:28px;position:relative;">
+                        <div style="color:#f59e0b;font-size:18px;margin-bottom:12px;">${stars}</div>
+                        <p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);margin-bottom:20px;">"${r.review_text.replace(/"/g,'&quot;')}"</p>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:36px;height:36px;background:${bg};border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:700;">${initials}</div>
+                            <div>
+                                <div style="font-family:var(--font-mono);font-size:12px;font-weight:700;">${r.reviewer_name.toUpperCase()}</div>
+                                ${r.reviewer_location ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">${r.reviewer_location.toUpperCase()}</div>` : ''}
+                            </div>
+                        </div>
+                        <div style="position:absolute;top:20px;right:24px;font-size:48px;color:rgba(255,0,0,0.08);font-family:var(--font-display);line-height:1;">"</div>
+                    </div>`;
+                }).join('');
+            } catch {}
+        }
+
         init();
+        loadReviews();
     </script>
+
+    <!-- Product Detail Modal -->
+    <div id="product-detail-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeProductDetail()">
+        <div style="background:var(--navy-card);border:1px solid var(--border);max-width:900px;width:100%;max-height:90vh;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;position:relative;" id="pdm-inner">
+            <!-- Close btn -->
+            <button onclick="closeProductDetail()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:white;font-size:20px;cursor:pointer;z-index:1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);">&#10005;</button>
+            <!-- Left: images -->
+            <div style="padding:0;background:rgba(0,0,0,0.2);display:flex;flex-direction:column;">
+                <div style="flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                    <img id="pdm-main-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;min-height:300px;" onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\'><rect fill=\'%23111\'/></svg>'">
+                </div>
+                <div id="pdm-thumbs" style="display:flex;gap:6px;padding:12px;overflow-x:auto;background:rgba(0,0,0,0.3);" class="scrollbar-thin"></div>
+            </div>
+            <!-- Right: info -->
+            <div style="padding:36px;display:flex;flex-direction:column;gap:16px;">
+                <div>
+                    <div class="font-mono text-muted" id="pdm-category" style="font-size:10px;letter-spacing:0.2em;margin-bottom:8px;"></div>
+                    <h2 id="pdm-title" style="font-family:var(--font-display);font-size:clamp(22px,3vw,36px);line-height:1.1;margin-bottom:8px;"></h2>
+                    <div id="pdm-price" style="font-family:var(--font-display);font-size:28px;color:var(--primary);"></div>
+                </div>
+                <div id="pdm-stock" style="padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+                <div id="pdm-desc" style="font-size:14px;line-height:1.8;color:rgba(255,255,255,0.75);"></div>
+                <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;">
+                    <button id="pdm-add-btn" onclick="addToCart(0)" class="btn btn-primary btn-full" style="font-size:14px;padding:16px;">ADD TO CART</button>
+                    <a href="javascript:void(0)" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" class="font-mono text-muted" style="font-size:10px;text-align:center;text-decoration:underline;cursor:pointer;">View Size Guide</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        #pdm-inner { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 640px) { #pdm-inner { grid-template-columns: 1fr; } }
+        .scrollbar-thin::-webkit-scrollbar { height: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+    </style>
 </body>
 </html>

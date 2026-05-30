@@ -6,6 +6,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = 5000;
@@ -141,6 +142,25 @@ async function initDb() {
             subscribed_at TIMESTAMP DEFAULT NOW(),
             is_active BOOLEAN DEFAULT true
         );
+        CREATE TABLE IF NOT EXISTS contact_submissions (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            subject VARCHAR(500) DEFAULT '',
+            message TEXT NOT NULL,
+            order_number VARCHAR(100) DEFAULT '',
+            status VARCHAR(50) DEFAULT 'new',
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS product_reviews (
+            id SERIAL PRIMARY KEY,
+            reviewer_name VARCHAR(255) NOT NULL,
+            reviewer_location VARCHAR(255) DEFAULT '',
+            rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+            review_text TEXT NOT NULL,
+            is_approved BOOLEAN DEFAULT false,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
     `);
 
     // Migrations
@@ -152,6 +172,7 @@ async function initDb() {
     await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price DECIMAL(10,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255) DEFAULT ''`);
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]'`);
 
     // Seed default settings
     const defaults = [
@@ -230,6 +251,29 @@ async function initDb() {
         ['about_title', 'BORN FROM THE SMOKE'],
         ['about_text', 'David Myalik is more than a brand — it\'s a culture. Built by drivers, for drivers. Every piece is designed for those who push limits and live for the drift.'],
         ['about_image', 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800'],
+        // Contact form
+        ['contact_form_email', ''],
+        // Email / SMTP settings
+        ['smtp_host', ''],
+        ['smtp_port', '587'],
+        ['smtp_secure', 'false'],
+        ['smtp_user', ''],
+        ['smtp_pass', ''],
+        ['smtp_from_name', 'David Myalik Store'],
+        ['smtp_from_email', ''],
+        // Email templates
+        ['email_order_confirmation_enabled', 'true'],
+        ['email_order_confirmation_subject', 'Order Confirmed — {{order_number}}'],
+        ['email_order_confirmation_body', 'Hi {{customer_name}},\n\nYour order {{order_number}} has been confirmed! 🔥\n\nTotal: ${{total}}\n\nWe\'ll let you know when it ships. You can track your order at: {{tracking_url}}\n\nSideways Always,\nDavid Myalik'],
+        ['email_order_shipped_enabled', 'true'],
+        ['email_order_shipped_subject', 'Your order {{order_number}} is on its way!'],
+        ['email_order_shipped_body', 'Hi {{customer_name}},\n\nGreat news — your order {{order_number}} has shipped! 📦\n\nTracking Number: {{tracking_number}}\nCarrier: {{carrier}}\n\nTrack your package: {{tracking_url}}\n\nExpected delivery: {{processing_days}} business days\n\nSideways Always,\nDavid Myalik'],
+        ['email_order_cancelled_enabled', 'true'],
+        ['email_order_cancelled_subject', 'Order {{order_number}} — Cancelled'],
+        ['email_order_cancelled_body', 'Hi {{customer_name}},\n\nYour order {{order_number}} has been cancelled.\n\nIf you have any questions, reply to this email or visit: {{site_url}}/contact\n\nSideways Always,\nDavid Myalik'],
+        ['email_contact_auto_reply_enabled', 'false'],
+        ['email_contact_auto_reply_subject', 'We got your message — David Myalik'],
+        ['email_contact_auto_reply_body', 'Hi {{customer_name}},\n\nThanks for reaching out! We received your message and will get back to you within 24-48 hours.\n\nYour subject: {{subject}}\n\nSideways Always,\nDavid Myalik'],
     ];
     for (const [key, value] of defaults) {
         await pool.query(
@@ -286,6 +330,76 @@ async function adminLog(req, action, details) {
             [req.user?.id || null, name, action, details]
         );
     } catch {}
+}
+
+// ─── EMAIL HELPER ────────────────────────────────────────────────────────────
+async function getSmtpSettings() {
+    const r = await pool.query("SELECT key, value FROM settings WHERE key LIKE 'smtp_%'");
+    const s = {};
+    r.rows.forEach(row => { s[row.key] = row.value; });
+    return s;
+}
+
+function buildTransporter(s) {
+    if (!s.smtp_host || !s.smtp_user || !s.smtp_pass) return null;
+    return nodemailer.createTransport({
+        host: s.smtp_host,
+        port: parseInt(s.smtp_port) || 587,
+        secure: s.smtp_secure === 'true',
+        auth: { user: s.smtp_user, pass: s.smtp_pass }
+    });
+}
+
+async function getEmailTemplate(key) {
+    const r = await pool.query("SELECT key, value FROM settings WHERE key LIKE $1", [key + '%']);
+    const t = {};
+    r.rows.forEach(row => { t[row.key] = row.value; });
+    return t;
+}
+
+function fillTemplate(tpl, vars) {
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] || '');
+}
+
+async function sendEmail({ to, subject, text, html }) {
+    try {
+        const s = await getSmtpSettings();
+        const transporter = buildTransporter(s);
+        if (!transporter) return false;
+        await transporter.sendMail({
+            from: `"${s.smtp_from_name || 'David Myalik Store'}" <${s.smtp_from_email || s.smtp_user}>`,
+            to, subject, text, html: html || `<pre style="font-family:sans-serif;white-space:pre-wrap;">${text}</pre>`
+        });
+        return true;
+    } catch (e) {
+        console.error('Email send error:', e.message);
+        return false;
+    }
+}
+
+async function sendOrderEmail(order, templateKey, extraVars = {}) {
+    try {
+        if (!order.shipping_email && !order.user_email) return;
+        const customerEmail = order.shipping_email || order.user_email;
+        const r = await pool.query("SELECT key, value FROM settings WHERE key LIKE $1 OR key = 'smtp_%'", [`email_${templateKey}%`]);
+        const settings = {};
+        r.rows.forEach(row => { settings[row.key] = row.value; });
+        if (settings[`email_${templateKey}_enabled`] !== 'true') return;
+        const siteUrl = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shopdavidmyalik.com';
+        const vars = {
+            customer_name: `${order.shipping_first_name || ''} ${order.shipping_last_name || ''}`.trim() || 'Customer',
+            order_number: order.order_number || '',
+            total: parseFloat(order.total || 0).toFixed(2),
+            tracking_number: order.tracking_number || 'N/A',
+            carrier: order.shipping_carrier || 'N/A',
+            tracking_url: `${siteUrl}/tracking?order=${order.order_number}`,
+            site_url: siteUrl,
+            ...extraVars
+        };
+        const subject = fillTemplate(settings[`email_${templateKey}_subject`] || '', vars);
+        const body = fillTemplate(settings[`email_${templateKey}_body`] || '', vars);
+        await sendEmail({ to: customerEmail, subject, text: body });
+    } catch (e) { console.error('sendOrderEmail error:', e.message); }
 }
 
 // ─── AUTH ROUTES ─────────────────────────────────────────────────────────────
@@ -477,6 +591,123 @@ app.get('/api/admin/newsletter/subscribers', requireAdmin, async (req, res) => {
         const r = await pool.query('SELECT * FROM newsletter_subscribers WHERE is_active = true ORDER BY subscribed_at DESC');
         res.json(r.rows);
     } catch { res.json([]); }
+});
+
+// ─── CONTACT FORM ────────────────────────────────────────────────────────────
+app.post('/api/contact', async (req, res) => {
+    const { name, email, subject, message, orderNumber } = req.body;
+    if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Valid email required' });
+    try {
+        await pool.query(
+            'INSERT INTO contact_submissions (name, email, subject, message, order_number) VALUES ($1,$2,$3,$4,$5)',
+            [name, email, subject || '', message, orderNumber || '']
+        );
+        // Send to store owner
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key = 'contact_form_email'");
+        const cfgEmail = cfgRes.rows[0]?.value;
+        if (cfgEmail) {
+            sendEmail({ to: cfgEmail, subject: `[Contact] ${subject || 'New message'} — from ${name}`, text: `From: ${name} <${email}>\nSubject: ${subject}\nOrder: ${orderNumber || 'N/A'}\n\n${message}` }).catch(() => {});
+        }
+        // Auto-reply
+        const arRes = await pool.query("SELECT key, value FROM settings WHERE key LIKE 'email_contact_auto_reply%'");
+        const arSettings = {};
+        arRes.rows.forEach(r => { arSettings[r.key] = r.value; });
+        if (arSettings.email_contact_auto_reply_enabled === 'true') {
+            const vars = { customer_name: name, subject: subject || '' };
+            const subj = fillTemplate(arSettings.email_contact_auto_reply_subject || 'We got your message', vars);
+            const body = fillTemplate(arSettings.email_contact_auto_reply_body || 'Thanks for reaching out!', vars);
+            sendEmail({ to: email, subject: subj, text: body }).catch(() => {});
+        }
+        res.json({ message: 'Message sent! We\'ll get back to you within 24-48 hours.' });
+    } catch (err) {
+        console.error('Contact form error:', err.message);
+        res.status(500).json({ error: 'Could not send message. Please try again.' });
+    }
+});
+
+app.get('/api/admin/contact-submissions', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM contact_submissions ORDER BY created_at DESC');
+        res.json(r.rows);
+    } catch { res.json([]); }
+});
+
+app.put('/api/admin/contact-submissions/:id/status', requireAdmin, async (req, res) => {
+    const { status } = req.body;
+    try {
+        await pool.query('UPDATE contact_submissions SET status=$1 WHERE id=$2', [status, req.params.id]);
+        res.json({ ok: true });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ─── REVIEWS ─────────────────────────────────────────────────────────────────
+app.get('/api/reviews', async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM product_reviews WHERE is_approved = true ORDER BY created_at DESC');
+        res.json(r.rows);
+    } catch { res.json([]); }
+});
+
+app.get('/api/admin/reviews', requireAdmin, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT * FROM product_reviews ORDER BY created_at DESC');
+        res.json(r.rows);
+    } catch { res.json([]); }
+});
+
+app.post('/api/admin/reviews', requireAdmin, async (req, res) => {
+    const { reviewer_name, reviewer_location, rating, review_text, is_approved } = req.body;
+    if (!reviewer_name || !rating || !review_text) return res.status(400).json({ error: 'Name, rating, and review text required' });
+    try {
+        const r = await pool.query(
+            'INSERT INTO product_reviews (reviewer_name, reviewer_location, rating, review_text, is_approved) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+            [reviewer_name, reviewer_location || '', parseInt(rating), review_text, !!is_approved]
+        );
+        res.json(r.rows[0]);
+    } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/admin/reviews/:id', requireAdmin, async (req, res) => {
+    const { reviewer_name, reviewer_location, rating, review_text, is_approved } = req.body;
+    try {
+        const r = await pool.query(
+            'UPDATE product_reviews SET reviewer_name=$1, reviewer_location=$2, rating=$3, review_text=$4, is_approved=$5 WHERE id=$6 RETURNING *',
+            [reviewer_name, reviewer_location || '', parseInt(rating), review_text, !!is_approved, req.params.id]
+        );
+        res.json(r.rows[0]);
+    } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/admin/reviews/:id', requireAdmin, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM product_reviews WHERE id=$1', [req.params.id]);
+        res.json({ ok: true });
+    } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ─── ORDER TRACKING (public) ─────────────────────────────────────────────────
+app.get('/api/order-tracking/:orderNumber', async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT o.order_number, o.status, o.total, o.created_at, o.tracking_number, o.shipping_carrier,
+                    o.shipping_first_name, o.shipping_last_name, o.shipping_address, o.shipping_city,
+                    o.shipping_state, o.shipping_zip, o.shipping_country, o.items
+             FROM orders o WHERE LOWER(o.order_number) = LOWER($1)`,
+            [req.params.orderNumber]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: 'Order not found' });
+        res.json(r.rows[0]);
+    } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ─── EMAIL TEST ───────────────────────────────────────────────────────────────
+app.post('/api/admin/email/test', requireAdmin, async (req, res) => {
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: 'Recipient email required' });
+    const ok = await sendEmail({ to, subject: 'Test Email — David Myalik Store', text: 'This is a test email from your David Myalik store. If you received this, your SMTP settings are working correctly! 🔥\n\nSideways Always,\nDavid Myalik Store' });
+    if (ok) res.json({ message: 'Test email sent successfully!' });
+    else res.status(500).json({ error: 'Failed to send. Check your SMTP settings.' });
 });
 
 // ─── ORDERS (user) ───────────────────────────────────────────────────────────
@@ -963,13 +1194,14 @@ app.get('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
-    const { name, description, price, salePrice, stock, category, isActive, imageUrl } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages } = req.body;
     if (!name || price === undefined) return res.status(400).json({ error: 'Name and price are required' });
     try {
         const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
+        const imgs = Array.isArray(productImages) ? productImages : [];
         const r = await pool.query(
-            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false]
+            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active, product_images) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, JSON.stringify(imgs)]
         );
         await adminLog(req, 'create_product', `Created product: ${name}`);
         res.json(r.rows[0]);
@@ -980,12 +1212,13 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
-    const { name, description, price, salePrice, stock, category, isActive, imageUrl } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages } = req.body;
     try {
         const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
+        const imgs = Array.isArray(productImages) ? productImages : [];
         const r = await pool.query(
-            'UPDATE products SET name=$1, description=$2, price=$3, sale_price=$4, image_url=$5, category=$6, stock=$7, is_active=$8 WHERE id=$9 RETURNING *',
-            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, req.params.id]
+            'UPDATE products SET name=$1, description=$2, price=$3, sale_price=$4, image_url=$5, category=$6, stock=$7, is_active=$8, product_images=$9 WHERE id=$10 RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, JSON.stringify(imgs), req.params.id]
         );
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
         await adminLog(req, 'update_product', `Updated product: ${name}`);
@@ -1391,6 +1624,8 @@ const htmlRoutes = {
     '/shipping-info': 'shipping-info.html',
     '/returns': 'returns.html',
     '/forgot-password': 'forgot-password.html',
+    '/contact': 'contact.html',
+    '/tracking': 'tracking.html',
     '/404': '404.html',
     '/500': '500.html',
 };

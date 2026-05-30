@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us | DAVID MYALIK</title>
+    <meta name="description" content="Get in touch with David Myalik — questions, returns, order issues, collabs, and more.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { background: var(--navy); min-height: 100vh; display: flex; flex-direction: column; }
+        .contact-page-wrap { flex: 1; padding: 110px 20px 80px; }
+        .contact-page-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.5fr; gap: 80px; align-items: flex-start; }
+        @media (max-width: 768px) { .contact-page-inner { grid-template-columns: 1fr; gap: 40px; } }
+        .contact-left-title { font-family: var(--font-display); font-size: clamp(40px,7vw,80px); line-height: 1; margin-bottom: 20px; }
+        .contact-info-block { padding: 20px 0; border-top: 1px solid var(--border); }
+        .contact-info-block:last-child { border-bottom: 1px solid var(--border); }
+        .contact-info-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; color: var(--primary); margin-bottom: 6px; }
+        .contact-info-value { font-size: 14px; color: var(--text); }
+        .subject-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .subject-chip { border: 1px solid var(--border); padding: 10px 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; cursor: pointer; text-align: center; transition: all 0.2s; background: transparent; color: var(--text-muted); }
+        .subject-chip:hover { border-color: var(--primary); color: var(--text); }
+        .subject-chip.selected { border-color: var(--primary); background: rgba(255,0,0,0.08); color: var(--text); }
+    </style>
+</head>
+<body>
+    <div id="site-nav"></div>
+
+    <div class="contact-page-wrap">
+        <div class="contact-page-inner">
+            <!-- Left: Info -->
+            <div>
+                <div class="font-mono text-muted" style="font-size:11px;letter-spacing:0.2em;margin-bottom:14px;">GET IN TOUCH</div>
+                <h1 class="contact-left-title">CONTACT <span class="text-red">US</span></h1>
+                <p class="font-mono text-muted" style="font-size:12px;line-height:1.9;margin-bottom:40px;">Questions, return requests, order issues, collabs — we're here. Fill out the form and we'll get back to you as soon as possible.</p>
+
+                <div class="contact-info-block">
+                    <div class="contact-info-label">EMAIL</div>
+                    <div class="contact-info-value" id="info-email">contact@davidmyalik.com</div>
+                </div>
+                <div class="contact-info-block">
+                    <div class="contact-info-label">RESPONSE TIME</div>
+                    <div class="contact-info-value">Usually within 24–48 hours</div>
+                </div>
+                <div class="contact-info-block">
+                    <div class="contact-info-label">ORDER ISSUES</div>
+                    <div class="contact-info-value" style="font-size:13px;">Have your order number ready — it helps us resolve things faster.</div>
+                </div>
+                <div style="margin-top:40px;">
+                    <div class="font-mono text-muted" style="font-size:10px;letter-spacing:0.15em;margin-bottom:12px;">QUICK LINKS</div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <a href="/tracking" class="font-mono" style="font-size:12px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:8px;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">→ Track your order</a>
+                        <a href="/returns" class="font-mono" style="font-size:12px;color:var(--text-muted);text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">→ Returns & exchanges</a>
+                        <a href="/shipping-info" class="font-mono" style="font-size:12px;color:var(--text-muted);text-decoration:none;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">→ Shipping info</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Form -->
+            <div>
+                <div style="padding:36px;background:rgba(255,255,255,0.02);border:1px solid var(--border);">
+                    <h2 style="font-family:var(--font-display);font-size:22px;margin-bottom:8px;">SEND A <span class="text-red">MESSAGE</span></h2>
+                    <p class="font-mono text-muted" style="font-size:10px;letter-spacing:0.1em;margin-bottom:28px;">ALL FIELDS REQUIRED UNLESS MARKED OPTIONAL</p>
+
+                    <!-- Subject chips -->
+                    <div style="margin-bottom:24px;">
+                        <label class="input-label" style="margin-bottom:10px;">WHAT'S THIS ABOUT?</label>
+                        <div class="subject-grid">
+                            <button type="button" class="subject-chip selected" onclick="selectSubject(this,'Order Issue')">ORDER ISSUE</button>
+                            <button type="button" class="subject-chip" onclick="selectSubject(this,'Return Request')">RETURN REQUEST</button>
+                            <button type="button" class="subject-chip" onclick="selectSubject(this,'General Question')">GENERAL QUESTION</button>
+                            <button type="button" class="subject-chip" onclick="selectSubject(this,'Collab / Business')">COLLAB / BUSINESS</button>
+                            <button type="button" class="subject-chip" onclick="selectSubject(this,'Refund Request')">REFUND REQUEST</button>
+                            <button type="button" class="subject-chip" onclick="selectSubject(this,'Other')">OTHER</button>
+                        </div>
+                        <input type="hidden" id="contact-subject" value="Order Issue">
+                    </div>
+
+                    <form id="contact-form" onsubmit="submitContact(event)">
+                        <div class="grid-2 mb-4">
+                            <div><label class="input-label">YOUR NAME</label><input type="text" class="input-field" id="c-name" required placeholder="First Last"></div>
+                            <div><label class="input-label">EMAIL ADDRESS</label><input type="email" class="input-field" id="c-email" required placeholder="you@email.com"></div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">ORDER NUMBER <span style="color:var(--text-muted);font-size:9px;">OPTIONAL</span></label>
+                            <input type="text" class="input-field" id="c-order" placeholder="e.g. DM-0042" style="text-transform:uppercase;letter-spacing:0.1em;" oninput="this.value=this.value.toUpperCase()">
+                        </div>
+                        <div class="mb-4">
+                            <label class="input-label">MESSAGE</label>
+                            <textarea class="input-field" id="c-message" required style="min-height:140px;" placeholder="Describe your issue or question in detail..."></textarea>
+                        </div>
+                        <div id="contact-status" style="margin-bottom:12px;font-family:var(--font-mono);font-size:12px;min-height:16px;"></div>
+                        <button type="submit" class="btn btn-primary btn-full" id="contact-submit-btn" style="font-size:14px;padding:16px;">SEND MESSAGE</button>
+                    </form>
+
+                    <div id="contact-success" style="display:none;text-align:center;padding:40px 20px;">
+                        <div style="width:72px;height:72px;background:rgba(34,197,94,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <h3 style="font-family:var(--font-display);font-size:28px;margin-bottom:8px;">MESSAGE <span class="text-red">SENT</span></h3>
+                        <p class="font-mono text-muted" style="font-size:12px;line-height:1.8;">We got your message and will get back to you within 24–48 hours. Check your inbox for a confirmation.</p>
+                        <button onclick="resetForm()" class="btn btn-secondary" style="margin-top:24px;">SEND ANOTHER</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="site-footer"></div>
+    <div class="toast-container" id="toast-container"></div>
+    <script src="/js/components.js"></script>
+    <script>
+        async function init() {
+            const res = await fetch('/api/auth/me').catch(() => null);
+            const data = res ? await res.json().catch(() => ({})) : {};
+            renderNav(data.user || null, { isStore: false });
+            renderFooter();
+
+            // Load contact email from settings
+            try {
+                const sr = await fetch('/api/settings/all');
+                const s = await sr.json();
+                if (s.contact_email) document.getElementById('info-email').textContent = s.contact_email;
+            } catch {}
+
+            // Pre-fill from URL params
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('order')) {
+                document.getElementById('c-order').value = params.get('order').toUpperCase();
+            }
+            if (params.get('subject')) {
+                const chips = document.querySelectorAll('.subject-chip');
+                chips.forEach(c => { c.classList.remove('selected'); if (c.textContent.trim().includes(params.get('subject').toUpperCase().slice(0,6))) { c.classList.add('selected'); document.getElementById('contact-subject').value = c.textContent.trim(); } });
+            }
+        }
+
+        function selectSubject(btn, val) {
+            document.querySelectorAll('.subject-chip').forEach(c => c.classList.remove('selected'));
+            btn.classList.add('selected');
+            document.getElementById('contact-subject').value = val;
+        }
+
+        async function submitContact(e) {
+            e.preventDefault();
+            const btn = document.getElementById('contact-submit-btn');
+            const status = document.getElementById('contact-status');
+            btn.disabled = true;
+            btn.textContent = 'SENDING...';
+            status.textContent = '';
+            try {
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('c-name').value,
+                        email: document.getElementById('c-email').value,
+                        subject: document.getElementById('contact-subject').value,
+                        message: document.getElementById('c-message').value,
+                        orderNumber: document.getElementById('c-order').value
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('contact-form').style.display = 'none';
+                    document.getElementById('contact-success').style.display = 'block';
+                } else {
+                    status.style.color = '#ef4444';
+                    status.textContent = data.error || 'Failed to send. Please try again.';
+                    btn.disabled = false;
+                    btn.textContent = 'SEND MESSAGE';
+                }
+            } catch {
+                status.style.color = '#ef4444';
+                status.textContent = 'Could not connect. Please try again.';
+                btn.disabled = false;
+                btn.textContent = 'SEND MESSAGE';
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('contact-form').reset();
+            document.getElementById('contact-form').style.display = 'block';
+            document.getElementById('contact-success').style.display = 'none';
+            document.getElementById('contact-status').textContent = '';
+            document.getElementById('contact-submit-btn').disabled = false;
+            document.getElementById('contact-submit-btn').textContent = 'SEND MESSAGE';
+            document.querySelectorAll('.subject-chip').forEach((c,i) => c.classList.toggle('selected', i===0));
+            document.getElementById('contact-subject').value = 'Order Issue';
+        }
+
+        init();
+    </script>
+</body>
+</html>
