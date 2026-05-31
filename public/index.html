@@ -1153,6 +1153,18 @@
         let _pdmQty = 1;
         let _pdmProductId = null;
         let _pdmMaxStock = 0;
+        let _pdmSelectedSize = null;
+        let _pdmHasSizes = false;
+
+        window.pdmSelectSize = function(size, isOut) {
+            if (isOut) return;
+            _pdmSelectedSize = size;
+            document.querySelectorAll('.pdm-size-btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById(`pdm-size-btn-${size}`);
+            if (btn) btn.classList.add('active');
+            const err = document.getElementById('pdm-size-error');
+            if (err) err.style.display = 'none';
+        };
 
         function pdmRenderImages() {
             const main = document.getElementById('pdm-main-img');
@@ -1387,26 +1399,28 @@
             } else {
                 cartFooter.style.display = 'block';
                 document.getElementById('cart-total').textContent = `$${subtotal.toFixed(2)}`;
-                container.innerHTML = cart.map(item => `
+                container.innerHTML = cart.map(item => {
+                    const ck = item.cartKey.replace(/'/g, "\\'");
+                    return `
                     <div style="display:flex;gap:12px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px;">
                         <img src="${item.image_url}" style="width:56px;height:56px;object-fit:cover;filter:grayscale(0.5);border:1px solid var(--border);">
                         <div style="flex:1;min-width:0;">
                             <h4 style="font-weight:700;text-transform:uppercase;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</h4>
-                            <p class="font-mono text-muted" style="font-size:11px;">$${item.price.toFixed(2)}</p>
+                            ${item.size ? `<span class="font-mono" style="font-size:10px;color:var(--primary);letter-spacing:0.05em;">SIZE: ${item.size}</span>` : ''}
+                            <p class="font-mono text-muted" style="font-size:11px;margin-top:2px;">$${item.price.toFixed(2)}</p>
                             <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-                                <button onclick="updateCartQty(${item.id}, -1)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);color:white;width:26px;height:26px;cursor:pointer;font-size:13px;">-</button>
+                                <button onclick="updateCartQty('${ck}', -1)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);color:white;width:26px;height:26px;cursor:pointer;font-size:13px;">-</button>
                                 <span class="font-mono" style="font-size:12px;min-width:18px;text-align:center;">${item.qty}</span>
-                                <button onclick="updateCartQty(${item.id}, 1)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);color:white;width:26px;height:26px;cursor:pointer;font-size:13px;">+</button>
+                                <button onclick="updateCartQty('${ck}', 1)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);color:white;width:26px;height:26px;cursor:pointer;font-size:13px;">+</button>
                             </div>
                         </div>
                         <div style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;">
-                            <button onclick="removeFromCart(${item.id})" style="background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;">
+                            <button onclick="removeFromCart('${ck}')" style="background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                             <span class="font-mono text-red" style="font-size:12px;font-weight:600;">$${(item.price * item.qty).toFixed(2)}</span>
                         </div>
-                    </div>
-                `).join('');
+                    </div>`; }).join('');
             }
         }
 
