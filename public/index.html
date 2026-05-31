@@ -655,6 +655,10 @@
                                 <span class="filter-radio"></span>
                                 In Stock Only
                             </div>
+                            <div class="filter-item" onclick="setAvailability('on-sale')">
+                                <span class="filter-radio"></span>
+                                On Sale
+                            </div>
                         </div>
                     </div>
 
@@ -814,7 +818,11 @@
         function loadCart() {
             try {
                 const saved = localStorage.getItem('dm-cart');
-                if (saved) cart = JSON.parse(saved);
+                if (saved) {
+                    cart = JSON.parse(saved);
+                    // Backward compat: add cartKey to old items
+                    cart.forEach(item => { if (!item.cartKey) item.cartKey = `${item.id}|`; });
+                }
             } catch (e) { cart = []; }
         }
 
@@ -1059,6 +1067,8 @@
             }
             if (activeAvailability === 'in-stock') {
                 filtered = filtered.filter(p => p.stock > 0);
+            } else if (activeAvailability === 'on-sale') {
+                filtered = filtered.filter(p => p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price));
             }
             if (activePriceRange !== 'all') {
                 const price = parseFloat;
@@ -1311,11 +1321,12 @@
             return (sp !== null && sp < reg) ? sp : reg;
         }
 
-        function addToCart(id) {
+        function addToCart(id, size = null) {
             const product = products.find(p => p.id === id);
             if (!product || product.stock <= 0) return;
             const effectivePrice = getEffectivePrice(product);
-            const existing = cart.find(i => i.id === id);
+            const cartKey = `${id}|${size || ''}`;
+            const existing = cart.find(i => i.cartKey === cartKey);
             if (existing) {
                 if (existing.qty >= product.stock) {
                     showToast(`Only ${product.stock} available`, 'error');
@@ -1324,26 +1335,26 @@
                 existing.qty++;
                 existing.price = effectivePrice;
             } else {
-                cart.push({ id: product.id, name: product.name, price: effectivePrice, image_url: product.image_url, qty: 1 });
+                cart.push({ cartKey, id: product.id, name: product.name, price: effectivePrice, image_url: product.image_url, qty: 1, size });
             }
             saveCart();
             updateCartUI();
-            showToast(`${product.name} added to cart`, 'success');
+            showToast(`${product.name}${size ? ` · ${size}` : ''} added to cart`, 'success');
             if (!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
         }
 
-        function removeFromCart(id) {
-            cart = cart.filter(i => i.id !== id);
+        function removeFromCart(cartKey) {
+            cart = cart.filter(i => i.cartKey !== cartKey);
             saveCart();
             updateCartUI();
         }
 
-        function updateCartQty(id, delta) {
-            const item = cart.find(i => i.id === id);
+        function updateCartQty(cartKey, delta) {
+            const item = cart.find(i => i.cartKey === cartKey);
             if (!item) return;
-            const product = products.find(p => p.id === id);
+            const product = products.find(p => p.id === item.id);
             item.qty += delta;
-            if (item.qty <= 0) { removeFromCart(id); return; }
+            if (item.qty <= 0) { removeFromCart(cartKey); return; }
             if (product && item.qty > product.stock) {
                 showToast(`Only ${product.stock} available`, 'error');
                 item.qty = product.stock;
@@ -1695,6 +1706,18 @@
                     <div id="pdm-rating-row" class="pdm-rating-row"></div>
                     <div id="pdm-price" class="pdm-price"></div>
                     <div id="pdm-stock" class="pdm-stock-row"></div>
+
+                    <!-- Size selector — shown for apparel products -->
+                    <div id="pdm-sizes-section" style="display:none;">
+                        <div class="pdm-size-label">
+                            SELECT SIZE
+                            <span style="color:var(--primary);font-size:9px;margin-left:6px;">REQUIRED</span>
+                            <button onclick="openSizeGuide()" style="background:none;border:none;color:var(--text-muted);font-family:var(--font-mono);font-size:9px;cursor:pointer;text-decoration:underline;margin-left:8px;">SIZE CHART</button>
+                        </div>
+                        <div id="pdm-size-btns" class="pdm-size-btns"></div>
+                        <div id="pdm-size-error" class="pdm-size-error" style="display:none;">&#9888; Please select a size before adding to cart</div>
+                    </div>
+
                     <p id="pdm-desc" class="pdm-desc"></p>
 
                     <!-- Qty + Add -->
@@ -1812,6 +1835,14 @@
             font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
         }
         .pdm-desc { font-size: 14px; line-height: 1.8; color: rgba(255,255,255,0.72); }
+        /* Size selector */
+        .pdm-size-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; }
+        .pdm-size-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .pdm-size-btn { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; padding: 10px 16px; border: 1px solid var(--border); background: none; color: white; cursor: pointer; transition: all 0.18s; min-width: 54px; text-align: center; line-height: 1.2; }
+        .pdm-size-btn:hover:not(.pdm-size-out) { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.04); }
+        .pdm-size-btn.active { border-color: var(--primary); background: rgba(255,0,0,0.1); color: var(--primary); font-weight: 700; }
+        .pdm-size-btn.pdm-size-out { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+        .pdm-size-error { font-family: var(--font-mono); font-size: 11px; color: #f59e0b; }
         .pdm-qty-row { display: flex; gap: 12px; align-items: stretch; }
         .pdm-qty-ctrl {
             display: flex; align-items: center; border: 1px solid var(--border);

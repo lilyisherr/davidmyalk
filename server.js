@@ -24,6 +24,16 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Security headers for production
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+});
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = path.join(__dirname, 'public', 'uploads');
@@ -173,6 +183,7 @@ async function initDb() {
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'`);
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255) DEFAULT ''`);
     await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]'`);
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT NULL`);
 
     // Seed default settings
     const defaults = [
@@ -1207,14 +1218,17 @@ app.get('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
-    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages, sizeInventory } = req.body;
     if (!name || price === undefined) return res.status(400).json({ error: 'Name and price are required' });
     try {
         const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
         const imgs = Array.isArray(productImages) ? productImages : [];
+        const sizeInv = sizeInventory && typeof sizeInventory === 'object' ? sizeInventory : null;
+        // If sizeInventory provided, auto-calculate total stock from sizes
+        const totalStock = sizeInv ? Object.values(sizeInv).reduce((s, v) => s + (parseInt(v) || 0), 0) : (parseInt(stock) || 0);
         const r = await pool.query(
-            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active, product_images) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, JSON.stringify(imgs)]
+            'INSERT INTO products (name, description, price, sale_price, image_url, category, stock, is_active, product_images, size_inventory) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', totalStock, isActive !== false, JSON.stringify(imgs), sizeInv ? JSON.stringify(sizeInv) : null]
         );
         await adminLog(req, 'create_product', `Created product: ${name}`);
         res.json(r.rows[0]);
@@ -1225,13 +1239,15 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
-    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages } = req.body;
+    const { name, description, price, salePrice, stock, category, isActive, imageUrl, productImages, sizeInventory } = req.body;
     try {
         const sp = salePrice !== undefined && salePrice !== '' && salePrice !== null ? parseFloat(salePrice) : null;
         const imgs = Array.isArray(productImages) ? productImages : [];
+        const sizeInv = sizeInventory && typeof sizeInventory === 'object' ? sizeInventory : null;
+        const totalStock = sizeInv ? Object.values(sizeInv).reduce((s, v) => s + (parseInt(v) || 0), 0) : (parseInt(stock) || 0);
         const r = await pool.query(
-            'UPDATE products SET name=$1, description=$2, price=$3, sale_price=$4, image_url=$5, category=$6, stock=$7, is_active=$8, product_images=$9 WHERE id=$10 RETURNING *',
-            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', parseInt(stock) || 0, isActive !== false, JSON.stringify(imgs), req.params.id]
+            'UPDATE products SET name=$1, description=$2, price=$3, sale_price=$4, image_url=$5, category=$6, stock=$7, is_active=$8, product_images=$9, size_inventory=$10 WHERE id=$11 RETURNING *',
+            [name, description || '', parseFloat(price), sp, imageUrl || '', category || '', totalStock, isActive !== false, JSON.stringify(imgs), sizeInv ? JSON.stringify(sizeInv) : null, req.params.id]
         );
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
         await adminLog(req, 'update_product', `Updated product: ${name}`);

@@ -1205,25 +1205,6 @@
                         </div>
                         <button class="btn btn-primary" onclick="saveBulkSettings(['about_title','about_text','about_image'])">SAVE</button>
                     </div>
-                    <div class="card" style="max-width:700px;margin-top:24px;">
-                        <h3 class="settings-card-title">NEWSLETTER <span class="text-red">SECTION</span></h3>
-                        <p class="settings-card-desc">Email signup section shown on the homepage.</p>
-                        <div class="mb-4">
-                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                                <input type="checkbox" id="set-newsletter_enabled" style="accent-color:var(--primary);width:20px;height:20px;">
-                                <span class="font-mono text-xs">SHOW NEWSLETTER SECTION</span>
-                            </label>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">TITLE</label>
-                            <input type="text" class="input-field" id="set-newsletter_title" placeholder="JOIN THE CULTURE">
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">SUBTITLE</label>
-                            <textarea class="input-field" id="set-newsletter_subtitle" style="min-height:60px;"></textarea>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['newsletter_enabled','newsletter_title','newsletter_subtitle'])">SAVE</button>
-                    </div>
                 </div>
 
                 <!-- CUSTOM CODE TAB -->
@@ -1374,10 +1355,52 @@
                     <div><label class="input-label">PRICE ($)</label><input type="number" step="0.01" min="0" class="input-field" id="prod-price" required></div>
                     <div><label class="input-label">SALE PRICE ($) <span style="color:var(--primary);font-size:10px;">OPTIONAL</span></label><input type="number" step="0.01" min="0" class="input-field" id="prod-sale-price" placeholder="Leave blank = no sale"></div>
                 </div>
-                <div class="mb-4">
+                <div class="mb-4" id="prod-stock-wrap">
                     <label class="input-label">STOCK</label>
-                    <input type="number" min="0" class="input-field" id="prod-stock" required>
-                    <span class="font-mono text-xs text-muted">How many units are available to purchase</span>
+                    <input type="number" min="0" class="input-field" id="prod-stock">
+                    <span class="font-mono text-xs text-muted">Total units available. Auto-calculated from sizes when using size inventory.</span>
+                </div>
+
+                <!-- Size Inventory (Apparel) -->
+                <div class="mb-4" id="prod-size-section" style="display:none;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                        <label class="input-label" style="margin:0;">SIZE INVENTORY <span style="color:var(--primary);font-size:9px;">APPAREL</span></label>
+                        <span class="font-mono text-xs text-muted" id="prod-size-total-display">Total: 0 units</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;" id="prod-sizes-grid">
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">XS</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-XS" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">S</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-S" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">M</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-M" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">L</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-L" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">XL</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-XL" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <label style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">2XL</label>
+                            <input type="number" min="0" value="0" class="input-field" id="size-2XL" oninput="updateSizeTotal()" style="font-family:var(--font-mono);text-align:center;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Size toggle checkbox -->
+                <div class="mb-4">
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                        <input type="checkbox" id="prod-use-sizes" style="accent-color:var(--primary);width:16px;height:16px;" onchange="toggleSizeInventory(this.checked)">
+                        <span class="font-mono text-xs">USE SIZE INVENTORY (for apparel with XS–2XL sizes)</span>
+                    </label>
                 </div>
                 <div class="grid-2 mb-4">
                     <div>
@@ -1820,7 +1843,6 @@
                 'order_webhook_url','webhook_secret',
                 // Storefront sections
                 'featured_collection_title','featured_collection_subtitle',
-                'newsletter_title','newsletter_subtitle',
                 'about_title','about_text','about_image',
                 // SMTP
                 'smtp_host','smtp_port','smtp_user','smtp_from_name','smtp_from_email','contact_form_email',
@@ -2694,6 +2716,20 @@
             try { extraImgs = typeof p.product_images === 'string' ? JSON.parse(p.product_images) : (Array.isArray(p.product_images) ? p.product_images : []); } catch {}
             extraImgs.filter(Boolean).forEach(url => addExtraImageField(url));
 
+            // Load size inventory
+            let sizeInv = null;
+            try { sizeInv = typeof p.size_inventory === 'string' ? JSON.parse(p.size_inventory) : p.size_inventory; } catch {}
+            const hasSizes = sizeInv && typeof sizeInv === 'object' && Object.values(sizeInv).some(v => parseInt(v) > 0);
+            document.getElementById('prod-use-sizes').checked = hasSizes;
+            toggleSizeInventory(hasSizes);
+            if (hasSizes) {
+                ['XS','S','M','L','XL','2XL'].forEach(s => {
+                    const el = document.getElementById(`size-${s}`);
+                    if (el) el.value = sizeInv[s] !== undefined ? sizeInv[s] : 0;
+                });
+                updateSizeTotal();
+            }
+
             document.getElementById('product-modal-title').innerHTML = 'EDIT <span class="text-red">PRODUCT</span>';
             document.getElementById('product-modal').classList.add('open');
         }
@@ -2712,16 +2748,26 @@
             }
 
             const salePriceRaw = document.getElementById('prod-sale-price').value.trim();
+            const useSizes = document.getElementById('prod-use-sizes').checked;
+            let sizeInventory = null;
+            if (useSizes) {
+                sizeInventory = {};
+                ['XS','S','M','L','XL','2XL'].forEach(s => {
+                    const el = document.getElementById(`size-${s}`);
+                    sizeInventory[s] = el ? parseInt(el.value) || 0 : 0;
+                });
+            }
             const payload = {
                 name: document.getElementById('prod-name').value,
                 description: document.getElementById('prod-description').value,
                 price: document.getElementById('prod-price').value,
                 salePrice: salePriceRaw !== '' ? salePriceRaw : null,
-                stock: document.getElementById('prod-stock').value,
+                stock: useSizes ? null : document.getElementById('prod-stock').value,
                 category: category,
                 isActive: document.getElementById('prod-active').value === 'true',
                 imageUrl: imageUrl,
-                productImages: getExtraImages()
+                productImages: getExtraImages(),
+                sizeInventory: sizeInventory
             };
             const url = id ? `/api/admin/products/${id}` : '/api/admin/products';
             const method = id ? 'PUT' : 'POST';
