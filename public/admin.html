@@ -2116,7 +2116,7 @@
             const settings = {};
             const checkFields = ['tax_enabled','checkout_terms_enabled','guest_checkout_enabled','maintenance_mode',
                 'banner_enabled','order_notification_enabled','low_stock_alert_enabled',
-                'show_out_of_stock_products','auto_reduce_stock','newsletter_enabled',
+                'show_out_of_stock_products','auto_reduce_stock',
                 'auto_deactivate_on_zero_stock','allow_backorders','show_low_stock_to_customers'];
             for (const key of keys) {
                 const el = document.getElementById('set-' + key);
@@ -2594,9 +2594,33 @@
             document.getElementById('prod-category-custom').style.display = 'none';
             document.getElementById('custom-cat-toggle').textContent = '+ Custom Category';
             clearExtraImages();
+            // Reset size inventory
+            document.getElementById('prod-use-sizes').checked = false;
+            toggleSizeInventory(false);
+            ['XS','S','M','L','XL','2XL'].forEach(s => { const el = document.getElementById(`size-${s}`); if (el) el.value = 0; });
+            document.getElementById('prod-size-total-display').textContent = 'Total: 0 units';
             document.getElementById('product-modal').classList.add('open');
         }
         function closeProductModal() { document.getElementById('product-modal').classList.remove('open'); }
+
+        function toggleSizeInventory(show) {
+            document.getElementById('prod-size-section').style.display = show ? 'block' : 'none';
+            const stockWrap = document.getElementById('prod-stock-wrap');
+            if (stockWrap) { stockWrap.style.opacity = show ? '0.4' : '1'; stockWrap.style.pointerEvents = show ? 'none' : ''; }
+            const stockInput = document.getElementById('prod-stock');
+            if (stockInput) stockInput.disabled = show;
+            if (show) updateSizeTotal();
+        }
+
+        function updateSizeTotal() {
+            const total = ['XS','S','M','L','XL','2XL'].reduce((sum, s) => {
+                const el = document.getElementById(`size-${s}`);
+                return sum + (parseInt(el?.value) || 0);
+            }, 0);
+            document.getElementById('prod-size-total-display').textContent = `Total: ${total} units`;
+            const stockInput = document.getElementById('prod-stock');
+            if (stockInput) stockInput.value = total;
+        }
 
         function setImageMode(mode) {
             imageMode = mode;

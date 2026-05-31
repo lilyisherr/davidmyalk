@@ -296,9 +296,17 @@
                     <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                         ${(o.items||[]).filter(i=>i.id).map(i => `<span class="font-mono" style="font-size:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:3px 8px;">${i.product_name} ×${i.quantity}</span>`).join('')}
                     </div>
-                    <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                        <span class="font-mono text-muted" style="font-size:10px;">TAP FOR DETAILS</span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="font-mono text-muted" style="font-size:10px;">TAP FOR DETAILS</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        </div>
+                        ${o.tracking_number ? `
+                        <a href="${getTrackingUrl(o.shipping_carrier, o.tracking_number)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+                           style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:#a855f7;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:4px 12px;text-decoration:none;transition:background 0.2s;"
+                           onmouseover="this.style.background='rgba(168,85,247,0.2)'" onmouseout="this.style.background='rgba(168,85,247,0.1)'">
+                           TRACK SHIPMENT &#8599;
+                        </a>` : ''}
                     </div>
                 </div>`;
             }).join('');
