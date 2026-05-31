@@ -90,6 +90,52 @@
             background: linear-gradient(90deg, transparent, rgba(255,0,0,0.3), transparent);
         }
 
+        /* ── Marquee ticker ── */
+        .marquee-strip {
+            background: var(--primary); padding: 12px 0; overflow: hidden;
+            position: relative; white-space: nowrap;
+        }
+        .marquee-track {
+            display: inline-block; animation: marquee 22s linear infinite;
+            font-family: var(--font-display); font-size: 13px; letter-spacing: 0.18em;
+            color: #fff; text-transform: uppercase;
+        }
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .marquee-sep { display: inline-block; margin: 0 28px; opacity: 0.6; }
+
+        /* ── Quick-add overlay ── */
+        .product-quick-add {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: var(--primary); color: #fff;
+            font-family: var(--font-display); font-size: 13px; letter-spacing: 0.15em;
+            text-transform: uppercase; text-align: center; padding: 12px;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            cursor: pointer; border: none; width: 100%;
+        }
+        .product-card:hover .product-quick-add { transform: translateY(0); }
+
+        /* ── Reviews empty state ── */
+        #reviews-empty {
+            display: none; text-align: center; padding: 60px 0;
+            grid-column: 1 / -1;
+        }
+
+        /* ── Section label pill ── */
+        .section-pill {
+            display: inline-block; background: rgba(255,0,0,0.1);
+            border: 1px solid rgba(255,0,0,0.25); color: var(--primary);
+            font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+            text-transform: uppercase; padding: 5px 14px; margin-bottom: 16px;
+        }
+
+        /* ── Accent underline for section titles ── */
+        .section-accent-line {
+            width: 48px; height: 3px; background: var(--primary); margin: 16px auto 0;
+        }
+
         .hero-section {
             position: relative; min-height: 100vh; display: flex; align-items: center;
             justify-content: center; overflow: hidden; padding-top: 80px;
@@ -555,6 +601,22 @@
         </div>
     </section>
 
+    <!-- ─── MARQUEE TICKER ────────────────────────────────────────────────── -->
+    <div class="marquee-strip">
+        <div class="marquee-track">
+            SIDEWAYS ALWAYS <span class="marquee-sep">✦</span>
+            DRIFT CULTURE APPAREL <span class="marquee-sep">✦</span>
+            BORN FROM THE SMOKE <span class="marquee-sep">✦</span>
+            BUILT FOR THE STREETS <span class="marquee-sep">✦</span>
+            SHOP THE DROP <span class="marquee-sep">✦</span>
+            SIDEWAYS ALWAYS <span class="marquee-sep">✦</span>
+            DRIFT CULTURE APPAREL <span class="marquee-sep">✦</span>
+            BORN FROM THE SMOKE <span class="marquee-sep">✦</span>
+            BUILT FOR THE STREETS <span class="marquee-sep">✦</span>
+            SHOP THE DROP <span class="marquee-sep">✦</span>
+        </div>
+    </div>
+
     <section id="shop" class="shop-section">
         <div class="shop-outer">
             <div class="reveal shop-header">
@@ -689,27 +751,16 @@
     <section id="reviews" style="padding:100px 40px;background:linear-gradient(180deg,var(--navy) 0%,var(--navy-light) 100%);">
         <div style="max-width:1200px;margin:0 auto;">
             <div class="reveal" style="text-align:center;margin-bottom:60px;">
-                <div class="font-mono text-muted" style="font-size:11px;letter-spacing:0.2em;margin-bottom:12px;">THE COMMUNITY</div>
+                <span class="section-pill">The Community</span>
                 <h2 style="font-size:clamp(36px,6vw,72px);font-family:var(--font-display);line-height:1;">THE <span class="text-red">PIT CREW</span></h2>
-                <p class="font-mono text-muted" style="font-size:12px;margin-top:16px;max-width:480px;margin-left:auto;margin-right:auto;">Real people, real smoke. From track days to street builds — the culture speaks for itself.</p>
+                <div class="section-accent-line"></div>
+                <p class="font-mono text-muted" style="font-size:12px;margin-top:20px;max-width:480px;margin-left:auto;margin-right:auto;">Real people, real smoke. From track days to street builds — the culture speaks for itself.</p>
             </div>
             <div id="reviews-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;" class="reveal">
                 <!-- Reviews loaded from API -->
             </div>
-            <!-- Stats strip -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:60px;" class="reveal">
-                <div style="background:var(--navy-light);padding:32px;text-align:center;">
-                    <div style="font-family:var(--font-display);font-size:clamp(32px,5vw,56px);color:var(--primary);">5K+</div>
-                    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;margin-top:6px;">ORDERS SHIPPED</div>
-                </div>
-                <div style="background:var(--navy-light);padding:32px;text-align:center;">
-                    <div style="font-family:var(--font-display);font-size:clamp(32px,5vw,56px);color:var(--primary);">4.9</div>
-                    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;margin-top:6px;">AVERAGE RATING</div>
-                </div>
-                <div style="background:var(--navy-light);padding:32px;text-align:center;">
-                    <div style="font-family:var(--font-display);font-size:clamp(32px,5vw,56px);color:var(--primary);">48H</div>
-                    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;margin-top:6px;">AVG DISPATCH TIME</div>
-                </div>
+            <div id="reviews-empty" style="display:none;text-align:center;padding:60px 0;" class="reveal">
+                <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:0.15em;">NO REVIEWS YET — BE THE FIRST.</div>
             </div>
         </div>
     </section>
@@ -1078,14 +1129,15 @@
                     ? `<p class="product-price">$${displayPrice.toFixed(2)}<span class="product-price-original">$${parseFloat(p.price).toFixed(2)}</span></p>`
                     : `<p class="product-price">$${displayPrice.toFixed(2)}</p>`;
                 const saleBadge = hasSale ? `<span class="sale-badge">SALE −${salePct}%</span>` : '';
+                const quickAdd = !isOutOfStock
+                    ? `<button class="product-quick-add" onclick="event.stopPropagation();addToCart(${p.id})">+ ADD TO CART</button>`
+                    : '';
                 return `
                 <div class="product-card reveal" style="position:relative;cursor:pointer;" onclick="openProductDetail(${p.id})">
                     <div class="product-img-wrap">
                         <img src="${p.image_url}" alt="${p.name}" loading="lazy">
-                        ${isOutOfStock ? '<div class="sold-out-overlay"><span class="sold-out-label">SOLD OUT</span></div>' : `
-                        <div class="product-overlay">
-                            <button onclick="event.stopPropagation();openProductDetail(${p.id})" class="btn btn-primary btn-sm">VIEW PRODUCT</button>
-                        </div>`}
+                        ${isOutOfStock ? '<div class="sold-out-overlay"><span class="sold-out-label">SOLD OUT</span></div>' : ''}
+                        ${quickAdd}
                     </div>
                     <div class="product-info">
                         ${saleBadge}
@@ -1509,7 +1561,8 @@
                 const grid = document.getElementById('reviews-grid');
                 if (!grid) return;
                 if (!reviews.length) {
-                    grid.innerHTML = '<div class="font-mono text-muted" style="font-size:11px;grid-column:1/-1;text-align:center;padding:40px;">No reviews yet.</div>';
+                    const empty = document.getElementById('reviews-empty');
+                    if (empty) { empty.style.display = 'block'; empty.classList.add('active'); }
                     return;
                 }
                 grid.innerHTML = reviews.map(r => {

@@ -245,7 +245,7 @@ async function initDb() {
         // Store extras
         ['featured_collection_title', 'FEATURED DROP'],
         ['featured_collection_subtitle', 'Limited edition pieces, built for the culture.'],
-        ['newsletter_enabled', 'true'],
+        ['newsletter_enabled', 'false'],
         ['newsletter_title', 'JOIN THE CULTURE'],
         ['newsletter_subtitle', 'Drop your email for exclusive releases, behind-the-scenes, and members-only discounts.'],
         ['about_title', 'BORN FROM THE SMOKE'],
