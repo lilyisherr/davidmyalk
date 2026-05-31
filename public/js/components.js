@@ -153,7 +153,7 @@ async function renderFooter() {
                         <a href="/contact" class="footer-link">Help Center</a>
                         <a href="/shipping-info" class="footer-link">Shipping Info</a>
                         <a href="/returns" class="footer-link">Returns & Exchanges</a>
-                        <a href="javascript:void(0)" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" class="footer-link">Size Guide</a>
+                        <a href="javascript:void(0)" onclick="openSizeGuideGlobal()" class="footer-link">Size Guide</a>
                     </div>
                     <div>
                         <div class="footer-col-title">Legal</div>
@@ -170,6 +170,76 @@ async function renderFooter() {
             </div>
         </footer>
     `;
+}
+
+const SIZE_GUIDE_MODAL_HTML = `
+<div id="size-guide-modal-global" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeSizeGuideGlobal()">
+  <div style="background:var(--navy-light);width:100%;max-width:680px;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto;position:relative;">
+    <div style="padding:24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--navy-light);z-index:1;">
+      <div>
+        <h2 style="font-family:'Anton',sans-serif;font-size:26px;margin:0;text-transform:uppercase;">SIZE <span style="color:#FF0000;">GUIDE</span></h2>
+        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:10px;margin:4px 0 0;letter-spacing:0.12em;">ALL MEASUREMENTS IN INCHES</p>
+      </div>
+      <button onclick="closeSizeGuideGlobal()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>
+    </div>
+    <div style="padding:32px;">
+      <div style="margin-bottom:36px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;color:#FF0000;margin-bottom:16px;">T-SHIRTS &amp; LONG SLEEVES</div>
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+            <th style="text-align:left;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SIZE</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">LENGTH</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SHOULDER</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">36–38"</td><td style="padding:10px 12px;text-align:center;">27"</td><td style="padding:10px 12px;text-align:center;">17"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">38–40"</td><td style="padding:10px 12px;text-align:center;">28"</td><td style="padding:10px 12px;text-align:center;">18"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">40–42"</td><td style="padding:10px 12px;text-align:center;">29"</td><td style="padding:10px 12px;text-align:center;">19"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">42–44"</td><td style="padding:10px 12px;text-align:center;">30"</td><td style="padding:10px 12px;text-align:center;">20"</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">44–46"</td><td style="padding:10px 12px;text-align:center;">31"</td><td style="padding:10px 12px;text-align:center;">21"</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div style="margin-bottom:36px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;color:#FF0000;margin-bottom:16px;">HOODIES &amp; SWEATSHIRTS</div>
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+            <th style="text-align:left;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SIZE</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">LENGTH</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SLEEVE</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">38–40"</td><td style="padding:10px 12px;text-align:center;">26"</td><td style="padding:10px 12px;text-align:center;">33"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">40–42"</td><td style="padding:10px 12px;text-align:center;">27"</td><td style="padding:10px 12px;text-align:center;">34"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">42–44"</td><td style="padding:10px 12px;text-align:center;">28"</td><td style="padding:10px 12px;text-align:center;">35"</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">44–46"</td><td style="padding:10px 12px;text-align:center;">29"</td><td style="padding:10px 12px;text-align:center;">36"</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">46–48"</td><td style="padding:10px 12px;text-align:center;">30"</td><td style="padding:10px 12px;text-align:center;">37"</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div style="padding:16px;background:rgba(255,0,0,0.05);border:1px solid rgba(255,0,0,0.15);">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;color:#FF0000;margin-bottom:8px;">FIT NOTE</div>
+        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:11px;line-height:1.7;margin:0;">Our apparel is designed with a <strong style="color:#fff;">relaxed / streetwear fit</strong>. If you're between sizes or prefer a more fitted look, size down.</p>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+function openSizeGuideGlobal() {
+    // Try the page-specific one first
+    const existing = document.getElementById('size-guide-modal');
+    if (existing) { existing.style.display = 'flex'; return; }
+    // Inject global one if not already there
+    if (!document.getElementById('size-guide-modal-global')) {
+        document.body.insertAdjacentHTML('beforeend', SIZE_GUIDE_MODAL_HTML);
+    }
+    document.getElementById('size-guide-modal-global').style.display = 'flex';
+}
+function closeSizeGuideGlobal() {
+    const m = document.getElementById('size-guide-modal-global');
+    if (m) m.style.display = 'none';
 }
 
 async function doLogout(e) {

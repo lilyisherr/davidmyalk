@@ -601,22 +601,6 @@
         </div>
     </section>
 
-    <!-- ─── MARQUEE TICKER ────────────────────────────────────────────────── -->
-    <div class="marquee-strip">
-        <div class="marquee-track">
-            SIDEWAYS ALWAYS <span class="marquee-sep">✦</span>
-            DRIFT CULTURE APPAREL <span class="marquee-sep">✦</span>
-            BORN FROM THE SMOKE <span class="marquee-sep">✦</span>
-            BUILT FOR THE STREETS <span class="marquee-sep">✦</span>
-            SHOP THE DROP <span class="marquee-sep">✦</span>
-            SIDEWAYS ALWAYS <span class="marquee-sep">✦</span>
-            DRIFT CULTURE APPAREL <span class="marquee-sep">✦</span>
-            BORN FROM THE SMOKE <span class="marquee-sep">✦</span>
-            BUILT FOR THE STREETS <span class="marquee-sep">✦</span>
-            SHOP THE DROP <span class="marquee-sep">✦</span>
-        </div>
-    </div>
-
     <section id="shop" class="shop-section">
         <div class="shop-outer">
             <div class="reveal shop-header">
@@ -1136,6 +1120,7 @@
                 <div class="product-card reveal" style="position:relative;cursor:pointer;" onclick="openProductDetail(${p.id})">
                     <div class="product-img-wrap">
                         <img src="${p.image_url}" alt="${p.name}" loading="lazy">
+                        <div class="product-overlay"><span style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;color:#fff;background:rgba(0,0,0,0.6);padding:10px 20px;border:1px solid rgba(255,255,255,0.2);">VIEW PRODUCT</span></div>
                         ${isOutOfStock ? '<div class="sold-out-overlay"><span class="sold-out-label">SOLD OUT</span></div>' : ''}
                         ${quickAdd}
                     </div>
@@ -1152,54 +1137,150 @@
             initScrollAnimations();
         }
 
-        function openProductDetail(productId) {
+        // ── Product Detail Modal state ──
+        let _pdmImages = [];
+        let _pdmCurrentImg = 0;
+        let _pdmQty = 1;
+        let _pdmProductId = null;
+        let _pdmMaxStock = 0;
+
+        function pdmRenderImages() {
+            const main = document.getElementById('pdm-main-img');
+            const thumbs = document.getElementById('pdm-thumbs');
+            if (main) { main.style.opacity = '0.5'; main.src = _pdmImages[_pdmCurrentImg] || ''; main.onload = () => main.style.opacity = '1'; }
+            if (thumbs) {
+                thumbs.innerHTML = _pdmImages.length > 1
+                    ? _pdmImages.map((src, i) => `<img src="${src}" class="pdm-thumb${i===_pdmCurrentImg?' active':''}" onclick="pdmSetImg(${i})" onerror="this.style.display='none'">`).join('')
+                    : '';
+            }
+            // Show/hide nav arrows
+            document.querySelectorAll('.pdm-nav-btn').forEach(b => b.style.display = _pdmImages.length > 1 ? '' : 'none');
+        }
+
+        window.pdmSetImg = function(i) { _pdmCurrentImg = i; pdmRenderImages(); };
+        window.pdmNavImg = function(dir) {
+            _pdmCurrentImg = (_pdmCurrentImg + dir + _pdmImages.length) % _pdmImages.length;
+            pdmRenderImages();
+        };
+        window.pdmChangeQty = function(delta) {
+            _pdmQty = Math.max(1, Math.min(_pdmMaxStock || 999, _pdmQty + delta));
+            const el = document.getElementById('pdm-qty-num');
+            if (el) el.textContent = _pdmQty;
+        };
+
+        window.openSizeGuide = function() {
+            const m = document.getElementById('size-guide-modal');
+            if (m) m.style.display = 'flex';
+        };
+
+        async function openProductDetail(productId) {
             const p = products.find(x => x.id === productId);
             if (!p) return;
-            const modal = document.getElementById('product-detail-modal');
+            _pdmProductId = p.id;
+            _pdmQty = 1;
+            _pdmMaxStock = p.stock;
+
             const hasSale = p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price);
             const displayPrice = hasSale ? parseFloat(p.sale_price) : parseFloat(p.price);
             const salePct = hasSale ? Math.round((1 - parseFloat(p.sale_price) / parseFloat(p.price)) * 100) : 0;
             const isOutOfStock = p.stock <= 0;
             const lowThreshold = window.LOW_STOCK_THRESHOLD || 10;
-            const images = (() => {
-                let imgs = [];
-                try { imgs = typeof p.product_images === 'string' ? JSON.parse(p.product_images) : (Array.isArray(p.product_images) ? p.product_images : []); } catch {}
-                return [p.image_url, ...imgs.filter(Boolean)].filter(Boolean);
-            })();
 
-            let currentImg = 0;
-            function renderModalImages() {
-                const main = document.getElementById('pdm-main-img');
-                const thumbs = document.getElementById('pdm-thumbs');
-                if (main) main.src = images[currentImg] || '';
-                if (thumbs) thumbs.innerHTML = images.length > 1 ? images.map((src, i) =>
-                    `<img src="${src}" onclick="window._pdmSetImg(${i})" style="width:60px;height:60px;object-fit:cover;border:2px solid ${i===currentImg?'var(--primary)':'var(--border)'};cursor:pointer;transition:border-color 0.15s;" onerror="this.style.display='none'">`
-                ).join('') : '';
-            }
-            window._pdmSetImg = function(i) { currentImg = i; renderModalImages(); };
+            // Build image list
+            let extraImgs = [];
+            try { extraImgs = typeof p.product_images === 'string' ? JSON.parse(p.product_images) : (Array.isArray(p.product_images) ? p.product_images : []); } catch {}
+            _pdmImages = [p.image_url, ...extraImgs.filter(Boolean)].filter(Boolean);
+            _pdmCurrentImg = 0;
 
-            document.getElementById('pdm-title').textContent = p.name;
+            // Populate fields
             document.getElementById('pdm-category').textContent = p.category || '';
-            document.getElementById('pdm-price').innerHTML = hasSale
-                ? `$${displayPrice.toFixed(2)} <span style="font-size:16px;text-decoration:line-through;color:var(--text-muted);font-family:var(--font-display);">$${parseFloat(p.price).toFixed(2)}</span> <span style="font-family:var(--font-mono);font-size:12px;color:var(--primary);"> −${salePct}%</span>`
-                : `$${displayPrice.toFixed(2)}`;
+            document.getElementById('pdm-title').textContent = p.name;
+            document.getElementById('pdm-qty-num').textContent = '1';
+
+            if (hasSale) {
+                document.getElementById('pdm-price').innerHTML =
+                    `$${displayPrice.toFixed(2)} <span style="font-size:18px;text-decoration:line-through;color:var(--text-muted);margin-left:8px;">$${parseFloat(p.price).toFixed(2)}</span><span style="font-family:var(--font-mono);font-size:12px;background:var(--primary);color:#fff;padding:2px 8px;margin-left:10px;">−${salePct}%</span>`;
+            } else {
+                document.getElementById('pdm-price').textContent = `$${displayPrice.toFixed(2)}`;
+            }
+
+            document.getElementById('pdm-stock').innerHTML = isOutOfStock
+                ? '<span style="color:#ef4444;">&#10005; Out of Stock</span>'
+                : p.stock <= lowThreshold
+                    ? `<span style="color:#f59e0b;">&#9888; Only ${p.stock} left in stock — order soon</span>`
+                    : '<span style="color:#22c55e;">&#10003; In Stock — Ready to ship</span>';
+
             document.getElementById('pdm-desc').textContent = p.description || '';
-            const stockEl = document.getElementById('pdm-stock');
-            stockEl.innerHTML = isOutOfStock ? '<span style="color:#ef4444;" class="font-mono" style="font-size:11px;">SOLD OUT</span>'
-                : p.stock <= lowThreshold ? `<span class="font-mono" style="font-size:11px;color:#f59e0b;">ONLY ${p.stock} LEFT IN STOCK</span>`
-                : `<span class="font-mono" style="font-size:11px;color:#22c55e;">IN STOCK</span>`;
+
             const addBtn = document.getElementById('pdm-add-btn');
             addBtn.disabled = isOutOfStock;
             addBtn.textContent = isOutOfStock ? 'SOLD OUT' : 'ADD TO CART';
-            addBtn.onclick = () => { addToCart(p.id); closeProductDetail(); };
+            addBtn.onclick = () => {
+                for (let i = 0; i < _pdmQty; i++) addToCart(_pdmProductId);
+            };
 
-            renderModalImages();
-            modal.style.display = 'flex';
+            // Qty control visibility
+            const qtyRow = document.querySelector('.pdm-qty-row');
+            if (qtyRow) qtyRow.style.display = isOutOfStock ? 'none' : 'flex';
+
+            pdmRenderImages();
+
+            // Open modal
+            const modal = document.getElementById('product-detail-modal');
+            modal.classList.add('pdm-open');
+            modal.scrollTop = 0;
             document.body.style.overflow = 'hidden';
+
+            // Load reviews async
+            loadPdmReviews();
+        }
+
+        async function loadPdmReviews() {
+            const grid = document.getElementById('pdm-reviews-grid');
+            const avgBadge = document.getElementById('pdm-avg-badge');
+            if (!grid) return;
+            grid.innerHTML = '<div class="pdm-no-reviews" style="opacity:0.5;">Loading reviews...</div>';
+            try {
+                const res = await fetch('/api/reviews');
+                const reviews = await res.json();
+                if (!reviews.length) {
+                    grid.innerHTML = '<div class="pdm-no-reviews">No reviews yet — be the first after your order.</div>';
+                    if (avgBadge) avgBadge.style.display = 'none';
+                    return;
+                }
+                const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+                const avgRounded = Math.round(avg * 10) / 10;
+                if (avgBadge) {
+                    avgBadge.style.display = 'block';
+                    avgBadge.innerHTML = `<div class="pdm-avg-num">${avgRounded}</div><div class="pdm-avg-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</div><div class="pdm-avg-count">${reviews.length} review${reviews.length !== 1 ? 's' : ''}</div>`;
+                }
+                // Rating row in product info
+                const ratingRow = document.getElementById('pdm-rating-row');
+                if (ratingRow) {
+                    ratingRow.innerHTML = `<span class="pdm-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span><span class="pdm-review-count">${avgRounded} · ${reviews.length} review${reviews.length !== 1 ? 's' : ''}</span>`;
+                }
+                grid.innerHTML = reviews.map(r => {
+                    const initials = r.reviewer_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                    return `<div class="pdm-review-card">
+                        <div class="pdm-review-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+                        <p class="pdm-review-text">"${r.review_text.replace(/"/g, '&quot;')}"</p>
+                        <div class="pdm-review-author">
+                            <div class="pdm-review-avatar">${initials}</div>
+                            <div>
+                                <div class="pdm-review-name">${r.reviewer_name.toUpperCase()}</div>
+                                ${r.reviewer_location ? `<div class="pdm-review-loc">${r.reviewer_location.toUpperCase()}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch {
+                grid.innerHTML = '<div class="pdm-no-reviews">Could not load reviews.</div>';
+            }
         }
 
         function closeProductDetail() {
-            document.getElementById('product-detail-modal').style.display = 'none';
+            const modal = document.getElementById('product-detail-modal');
+            modal.classList.remove('pdm-open');
             document.body.style.overflow = '';
         }
 
@@ -1590,40 +1671,231 @@
         loadReviews();
     </script>
 
-    <!-- Product Detail Modal -->
-    <div id="product-detail-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeProductDetail()">
-        <div style="background:var(--navy-card);border:1px solid var(--border);max-width:900px;width:100%;max-height:90vh;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;position:relative;" id="pdm-inner">
-            <!-- Close btn -->
-            <button onclick="closeProductDetail()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:white;font-size:20px;cursor:pointer;z-index:1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);">&#10005;</button>
-            <!-- Left: images -->
-            <div style="padding:0;background:rgba(0,0,0,0.2);display:flex;flex-direction:column;">
-                <div style="flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                    <img id="pdm-main-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;min-height:300px;" onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\'><rect fill=\'%23111\'/></svg>'">
+    <!-- ─── PRODUCT DETAIL MODAL ──────────────────────────────────────────── -->
+    <div id="product-detail-modal" onclick="if(event.target===this)closeProductDetail()">
+        <div class="pdm-container" id="pdm-container">
+            <button class="pdm-close-btn" onclick="closeProductDetail()">&#10005;</button>
+
+            <!-- TOP: Gallery + Info -->
+            <div class="pdm-top">
+                <!-- Gallery -->
+                <div class="pdm-gallery">
+                    <div class="pdm-main-wrap">
+                        <button class="pdm-nav-btn pdm-nav-prev" onclick="pdmNavImg(-1)">&#8249;</button>
+                        <img id="pdm-main-img" src="" alt="" class="pdm-main-img">
+                        <button class="pdm-nav-btn pdm-nav-next" onclick="pdmNavImg(1)">&#8250;</button>
+                    </div>
+                    <div id="pdm-thumbs" class="pdm-thumbs-strip"></div>
                 </div>
-                <div id="pdm-thumbs" style="display:flex;gap:6px;padding:12px;overflow-x:auto;background:rgba(0,0,0,0.3);" class="scrollbar-thin"></div>
+
+                <!-- Info Panel -->
+                <div class="pdm-info-panel">
+                    <div class="font-mono text-muted" id="pdm-category" style="font-size:10px;letter-spacing:0.2em;margin-bottom:10px;text-transform:uppercase;"></div>
+                    <h2 id="pdm-title" class="pdm-title"></h2>
+                    <div id="pdm-rating-row" class="pdm-rating-row"></div>
+                    <div id="pdm-price" class="pdm-price"></div>
+                    <div id="pdm-stock" class="pdm-stock-row"></div>
+                    <p id="pdm-desc" class="pdm-desc"></p>
+
+                    <!-- Qty + Add -->
+                    <div class="pdm-qty-row">
+                        <div class="pdm-qty-ctrl">
+                            <button class="pdm-qty-btn" onclick="pdmChangeQty(-1)">&#8722;</button>
+                            <span id="pdm-qty-num" class="pdm-qty-num">1</span>
+                            <button class="pdm-qty-btn" onclick="pdmChangeQty(1)">&#43;</button>
+                        </div>
+                        <button id="pdm-add-btn" class="btn btn-primary pdm-atc-btn">ADD TO CART</button>
+                    </div>
+
+                    <button class="pdm-size-guide-link" onclick="openSizeGuide()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                        Size Guide
+                    </button>
+
+                    <div class="pdm-trust-row">
+                        <div class="pdm-trust-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                            Free shipping over $100
+                        </div>
+                        <div class="pdm-trust-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            30-day returns
+                        </div>
+                        <div class="pdm-trust-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Secure checkout
+                        </div>
+                    </div>
+                </div>
             </div>
-            <!-- Right: info -->
-            <div style="padding:36px;display:flex;flex-direction:column;gap:16px;">
-                <div>
-                    <div class="font-mono text-muted" id="pdm-category" style="font-size:10px;letter-spacing:0.2em;margin-bottom:8px;"></div>
-                    <h2 id="pdm-title" style="font-family:var(--font-display);font-size:clamp(22px,3vw,36px);line-height:1.1;margin-bottom:8px;"></h2>
-                    <div id="pdm-price" style="font-family:var(--font-display);font-size:28px;color:var(--primary);"></div>
+
+            <!-- REVIEWS SECTION -->
+            <div class="pdm-reviews-section">
+                <div class="pdm-reviews-header">
+                    <h3 class="pdm-reviews-title">WHAT PEOPLE ARE <span class="text-red">SAYING</span></h3>
+                    <div id="pdm-avg-badge" class="pdm-avg-badge" style="display:none;"></div>
                 </div>
-                <div id="pdm-stock" style="padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
-                <div id="pdm-desc" style="font-size:14px;line-height:1.8;color:rgba(255,255,255,0.75);"></div>
-                <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;">
-                    <button id="pdm-add-btn" onclick="addToCart(0)" class="btn btn-primary btn-full" style="font-size:14px;padding:16px;">ADD TO CART</button>
-                    <a href="javascript:void(0)" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" class="font-mono text-muted" style="font-size:10px;text-align:center;text-decoration:underline;cursor:pointer;">View Size Guide</a>
+                <div id="pdm-reviews-grid" class="pdm-reviews-grid">
+                    <div class="font-mono text-muted" style="font-size:11px;text-align:center;padding:40px 0;letter-spacing:0.1em;">LOADING REVIEWS...</div>
                 </div>
             </div>
         </div>
     </div>
+
     <style>
-        #pdm-inner { grid-template-columns: 1fr 1fr; }
-        @media (max-width: 640px) { #pdm-inner { grid-template-columns: 1fr; } }
-        .scrollbar-thin::-webkit-scrollbar { height: 4px; }
-        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+        /* ── Product Detail Modal ── */
+        #product-detail-modal {
+            display: none; position: fixed; inset: 0; z-index: 9000;
+            background: rgba(0,0,0,0.92); overflow-y: auto;
+            padding: 0;
+        }
+        #product-detail-modal.pdm-open { display: block; }
+        .pdm-container {
+            background: var(--navy-card); border: 1px solid var(--border);
+            max-width: 1080px; width: 100%; margin: 60px auto 40px;
+            position: relative;
+        }
+        .pdm-close-btn {
+            position: fixed; top: 16px; right: 20px; z-index: 9001;
+            background: rgba(15,22,35,0.9); border: 1px solid var(--border);
+            color: white; font-size: 18px; cursor: pointer;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s;
+        }
+        .pdm-close-btn:hover { background: var(--primary); }
+        .pdm-top {
+            display: grid; grid-template-columns: 55% 45%;
+        }
+        /* Gallery */
+        .pdm-gallery { background: rgba(0,0,0,0.25); display: flex; flex-direction: column; }
+        .pdm-main-wrap {
+            position: relative; flex: 1; min-height: 420px;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .pdm-main-img { width: 100%; height: 100%; object-fit: cover; min-height: 420px; transition: opacity 0.2s; }
+        .pdm-nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.55); border: none; color: white;
+            font-size: 28px; padding: 8px 14px; cursor: pointer;
+            opacity: 0; transition: opacity 0.2s; z-index: 2;
+        }
+        .pdm-main-wrap:hover .pdm-nav-btn { opacity: 1; }
+        .pdm-nav-prev { left: 0; }
+        .pdm-nav-next { right: 0; }
+        .pdm-thumbs-strip {
+            display: flex; gap: 8px; padding: 14px;
+            overflow-x: auto; border-top: 1px solid var(--border);
+            background: rgba(0,0,0,0.15); min-height: 0;
+        }
+        .pdm-thumb {
+            width: 72px; height: 72px; object-fit: cover; flex-shrink: 0;
+            border: 2px solid var(--border); cursor: pointer; transition: border-color 0.2s;
+        }
+        .pdm-thumb.active, .pdm-thumb:hover { border-color: var(--primary); }
+        /* Info panel */
+        .pdm-info-panel {
+            padding: 36px; display: flex; flex-direction: column; gap: 18px;
+            border-left: 1px solid var(--border); overflow-y: auto; max-height: 640px;
+        }
+        .pdm-title {
+            font-family: var(--font-display); font-size: clamp(22px,2.5vw,34px);
+            line-height: 1.05; text-transform: uppercase;
+        }
+        .pdm-rating-row { display: flex; align-items: center; gap: 8px; }
+        .pdm-stars { color: #f59e0b; font-size: 16px; letter-spacing: 2px; }
+        .pdm-review-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+        .pdm-price {
+            font-family: var(--font-display); font-size: 32px; color: var(--primary); line-height: 1;
+        }
+        .pdm-stock-row {
+            padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+        }
+        .pdm-desc { font-size: 14px; line-height: 1.8; color: rgba(255,255,255,0.72); }
+        .pdm-qty-row { display: flex; gap: 12px; align-items: stretch; }
+        .pdm-qty-ctrl {
+            display: flex; align-items: center; border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+        }
+        .pdm-qty-btn {
+            background: none; border: none; color: white; cursor: pointer;
+            font-size: 18px; width: 40px; height: 48px; display: flex;
+            align-items: center; justify-content: center; transition: color 0.2s;
+        }
+        .pdm-qty-btn:hover { color: var(--primary); }
+        .pdm-qty-num {
+            min-width: 36px; text-align: center;
+            font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+        }
+        .pdm-atc-btn { flex: 1; font-size: 15px; padding: 14px 24px; letter-spacing: 0.12em; }
+        .pdm-size-guide-link {
+            background: none; border: 1px solid var(--border); color: var(--text-muted);
+            font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+            text-transform: uppercase; padding: 10px 16px; cursor: pointer;
+            display: flex; align-items: center; gap: 8px; transition: all 0.2s; width: 100%;
+            justify-content: center;
+        }
+        .pdm-size-guide-link:hover { border-color: var(--primary); color: var(--primary); }
+        .pdm-trust-row {
+            display: flex; flex-direction: column; gap: 8px;
+            border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px;
+        }
+        .pdm-trust-item {
+            display: flex; align-items: center; gap: 8px;
+            font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+        }
+        /* Reviews section */
+        .pdm-reviews-section {
+            border-top: 1px solid var(--border); padding: 48px;
+        }
+        .pdm-reviews-header {
+            display: flex; align-items: center; gap: 24px; margin-bottom: 32px; flex-wrap: wrap;
+        }
+        .pdm-reviews-title {
+            font-family: var(--font-display); font-size: clamp(22px,3vw,36px); line-height: 1;
+        }
+        .pdm-avg-badge {
+            background: var(--navy-light); border: 1px solid var(--border);
+            padding: 12px 20px; text-align: center;
+        }
+        .pdm-avg-badge .pdm-avg-num {
+            font-family: var(--font-display); font-size: 36px; color: var(--primary); line-height: 1;
+        }
+        .pdm-avg-badge .pdm-avg-stars { color: #f59e0b; font-size: 14px; margin-top: 2px; }
+        .pdm-avg-badge .pdm-avg-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+        .pdm-reviews-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;
+        }
+        .pdm-review-card {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 24px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .pdm-review-stars { color: #f59e0b; font-size: 15px; }
+        .pdm-review-text { font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.8); font-style: italic; }
+        .pdm-review-author { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+        .pdm-review-avatar {
+            width: 36px; height: 36px; border-radius: 50%; background: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-mono); font-size: 12px; font-weight: 700; flex-shrink: 0;
+        }
+        .pdm-review-name { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+        .pdm-review-loc { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+        .pdm-no-reviews {
+            grid-column: 1/-1; text-align: center; padding: 48px 0;
+            font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.15em;
+        }
+        @media (max-width: 700px) {
+            .pdm-top { grid-template-columns: 1fr; }
+            .pdm-info-panel { max-height: none; border-left: none; border-top: 1px solid var(--border); padding: 24px; }
+            .pdm-main-wrap { min-height: 300px; }
+            .pdm-main-img { min-height: 300px; }
+            .pdm-container { margin: 0; }
+            .pdm-reviews-section { padding: 24px; }
+        }
+        /* Thin scrollbar for thumb strip */
+        .pdm-thumbs-strip::-webkit-scrollbar { height: 4px; }
+        .pdm-thumbs-strip::-webkit-scrollbar-track { background: transparent; }
+        .pdm-thumbs-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
     </style>
 </body>
 </html>
