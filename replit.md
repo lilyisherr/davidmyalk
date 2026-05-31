@@ -4,7 +4,7 @@ A full-stack e-commerce site for drift culture apparel brand "David Myalik / Sid
 
 ## Project Structure
 - `server.js` — Express server with all API routes, auth, and DB initialization
-- `public/` — Static frtend (HTML, CSS, JS
+- `public/` — Static frytend (HTML, CSS, JS
 - `api/checkout.js` — Legacy Netlify serverless function (not used by the Express server
 - `package.json` — Nodejs project dependencie
 
