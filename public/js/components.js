@@ -44,12 +44,12 @@ function renderNav(currentUser, options = {}) {
                     <a href="${shopHref}" class="nav-link">SHOP</a>
                     <a href="${aboutHref}" class="nav-link">ABOUT</a>
                     <a href="${contactHref}" class="nav-link">CONTACT</a>
-                    <a href="javascript:void(0)" class="nav-link" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" style="font-size:11px;opacity:0.7;">SIZE GUIDE</a>
+                    <a href="javascript:void(0)" class="nav-link" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.12em;">SIZE GUIDE</a>
                     ${authHTML}
                     ${isStore ? `
                     <button id="cart-btn" style="position:relative;background:none;border:none;color:white;cursor:pointer;" aria-label="Cart">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                        <span id="cart-count" style="position:absolute;top:-8px;right:-8px;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);display:none;">0</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"></circle><circle cx="19" cy="21" r="1.5"></circle><path d="M2.5 3h2l2.4 10.2a1 1 0 0 0 1 .8h9.8a1 1 0 0 0 1-.8L18.5 6H5"></path></svg>
+                        <span id="cart-count" style="position:absolute;top:-8px;right:-8px;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);">0</span>
                     </button>` : ''}
                 </div>
                 <button class="mobile-menu-toggle" id="mobile-menu-btn" aria-label="Menu">
@@ -76,12 +76,12 @@ function renderNav(currentUser, options = {}) {
 }
 
 const SOCIAL_ICONS = {
-    youtube: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/><path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="var(--navy-light)"/></svg>',
+    youtube: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .5 6.186C0 8.07 0 12 0 12s0 3.93.5 5.814a3.016 3.016 0 0 0 2.123 2.136c1.872.505 9.377.505 9.377.505s7.505 0 9.377-.505a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
     instagram: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>',
-    twitter: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
-    discord: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>',
-    tiktok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.48v-7.15a8.16 8.16 0 005.58 2.19v-3.44a4.85 4.85 0 01-2-.59z"/></svg>',
-    facebook: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>'
+    twitter: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231L18.244 2.25zm-1.16 17.17h1.833L7.084 4.68H5.17l11.914 14.74z"/></svg>',
+    discord: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.3732a18.6972 18.6972 0 00-10.6876-.002c-.1636-.5146-.3973-1.004-.6084-1.3794a.0741.0741 0 00-.0786-.0371A19.78 19.78 0 003.683 4.3698a.072.072 0 00-.037.0272C.105 9.1145 0 13.1495 0 17.1548a.0829.0829 0 00.0317.067c2.1688 1.6057 4.2707 2.5583 6.3189 3.1883a.079.079 0 00.0858-.0335c.487-.665 1.053-1.5375 1.444-2.2304a.0739.0739 0 00-.0404-.1047c-.816-.3091-1.564-.7003-2.288-1.1453a.0736.0736 0 01-.0073-.1237c.1537-.1143.3068-.2341.4549-.3563a.0749.0749 0 01.0784-.0122c4.768 2.1795 9.9293 2.1795 14.6846 0a.0749.0749 0 01.0784.0122c.1481.1222.3012.2419.4549.3563a.0736.0736 0 01-.0073.1237c-.7234.445-.4715.8361-2.2879 1.1453a.0739.0739 0 00-.0404.1047c.3919.693 957 1.5655 1.444 2.2304a.079.079 0 00.0858.0335c2.0498-.6301 4.1517-1.5826 6.3189-3.1883a.0829.0829 0 00.0318-.067c0-4.0053-.105-8.0403-3.646-12.7584a.0715.0715 0 00-.037-.0272zm-12.32 14.3633c-1.23 0-2.248-1.1239-2.248-2.5078s1.017-2.5078 2.248-2.5078c1.231 0 2.25 1.1239 2.248 2.5078 0 1.3839-1.017 2.5078-2.248 2.5078zm9.984 0c-1.23 0-2.248-1.1239-2.248-2.5078s1.018-2.5078 2.248-2.5078c1.231 0 2.249 1.1239 2.249 2.5078s-1.018 2.5078-2.249 2.5078z"/></svg>',
+    tiktok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.61 0 1.18.19 1.65.52V8.91a6.19 6.19 0 00-1.65-.21A6.16 6.16 0 006.55 15.1 6.16 6.16 0 0012.72 21.3a6.15 6.15 0 005.87-3.85V6.69h.99z"/></svg>',
+    facebook: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.952h-1.513c-1.49 0-1.953.925-1.953 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>'
 };
 
 async function renderFooter() {
@@ -173,9 +173,9 @@ async function renderFooter() {
 }
 
 const SIZE_GUIDE_MODAL_HTML = `
-<div id="size-guide-modal-global" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeSizeGuideGlobal()">
+<div id="size-guide-modal-global" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this){closeSizeGuideGlobal();}">
   <div style="background:var(--navy-light);width:100%;max-width:680px;border:1px solid rgba(255,255,255,0.08);max-height:92vh;overflow-y:auto;position:relative;">
-    <div style="padding:24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--navy-light);z-index:1;">
+    <div style="padding:24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--navy-light);z-index:2;">
       <div>
         <h2 style="font-family:'Anton',sans-serif;font-size:26px;margin:0;text-transform:uppercase;">SIZE <span style="color:#FF0000;">GUIDE</span></h2>
         <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:10px;margin:4px 0 0;letter-spacing:0.12em;">ALL MEASUREMENTS IN INCHES</p>
@@ -221,17 +221,15 @@ const SIZE_GUIDE_MODAL_HTML = `
       </div>
       <div style="padding:16px;background:rgba(255,0,0,0.05);border:1px solid rgba(255,0,0,0.15);">
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;color:#FF0000;margin-bottom:8px;">FIT NOTE</div>
-        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:11px;line-height:1.7;margin:0;">Our apparel is designed with a <strong style="color:#fff;">relaxed / streetwear fit</strong>. If you're between sizes or prefer a more fitted look, size down.</p>
+        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:11px;line-height:1.7;margin:0;">Our apparel is designed with a <strong style="color:#fff;">relaxed / streetwear fit</strong>. If you’re between sizes or prefer a more fitted look, size down. If you want that oversized culture look, stay true to size or size up.</p>
       </div>
     </div>
   </div>
 </div>`;
 
 function openSizeGuideGlobal() {
-    // Try the page-specific one first
     const existing = document.getElementById('size-guide-modal');
     if (existing) { existing.style.display = 'flex'; return; }
-    // Inject global one if not already there
     if (!document.getElementById('size-guide-modal-global')) {
         document.body.insertAdjacentHTML('beforeend', SIZE_GUIDE_MODAL_HTML);
     }
@@ -262,3 +260,132 @@ function showToast(msg, type) {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
+
+(function(){
+    const fixStyles = document.createElement('style');
+    fixStyles.textContent = `
+        #size-guide-modal,
+        #size-guide-modal-global { z-index: 100000 !important; }
+        #checkout-modal { z-index: 100000 !important; }
+    `;
+    document.head.appendChild(fixStyles);
+
+    function refreshCartPricesAndTotals() {
+        if (!Array.isArray(window.cart) || !Array.isArray(window.products)) return;
+        const nextCart = window.cart
+            .map((item) => {
+                const product = window.products.find((p) => String(p.id) === String(item.id || item.productId));
+                if (!product || product.is_active === false) return null;
+                const price = Number(product.price ?? item.unitPrice ?? 0);
+                const qty = Number(item.qty ?? item.quantity ?? 1) || 1;
+                return {
+                    ...item,
+                    id: item.id ?? product.id,
+                    productId: item.productId ?? product.id,
+                    qty,
+                    unitPrice: Number.isFinite(price) ? price : 0,
+                    selectedSize: item.selectedSize || item.size || null,
+                    lineTotal: Number.isFinite(price) ? price * qty : 0
+                };
+            })
+            .filter(Boolean);
+
+        if (nextCart.length !== window.cart.length || nextCart.some((item, index) => {
+            const current = window.cart[index];
+            return !current || current.id !== item.id || Number(current.lineTotal || 0) !== Number(item.lineTotal || 0);
+        })) {
+            window.cart = nextCart;
+            if (typeof window.saveCart === 'function') window.saveCart();
+            if (typeof window.updateCartUI === 'function') window.updateCartUI();
+        }
+    }
+
+    function recoverCheckoutButtonState() {
+        const btn = document.getElementById('place-order-btn');
+        if (!btn) return;
+        const label = (btn.textContent || '').trim().toLowerCase();
+        if (label.includes('processing') || label.includes('checking')) {
+            btn.textContent = 'RESUME PAYMENT';
+            btn.disabled = false;
+        }
+    }
+
+    window.addEventListener('load', () => {
+        refreshCartPricesAndTotals();
+        recoverCheckoutButtonState();
+
+        if (typeof window.loadCart === 'function') {
+            const originalLoadCart = window.loadCart;
+            window.loadCart = function () {
+                const result = originalLoadCart.apply(this, arguments);
+                refreshCartPricesAndTotals();
+                return result;
+            };
+        }
+
+        if (typeof window.saveCart === 'function') {
+            const originalSaveCart = window.saveCart;
+            window.saveCart = function () {
+                const result = originalSaveCart.apply(this, arguments);
+                refreshCartPricesAndTotals();
+                return result;
+            };
+        }
+
+        if (typeof window.handleCheckoutReturn === 'function') {
+            const originalHandleCheckoutReturn = window.handleCheckoutReturn;
+            window.handleCheckoutReturn = async function () {
+                try {
+                    const btn = document.getElementById('place-order-btn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'CHECKING ORDER...';
+                    }
+                    const res = await fetch('/api/checkout-status');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.status === 'processing') {
+                            if (btn) {
+                                btn.textContent = 'RESUME PAYMENT';
+                                btn.disabled = false;
+                            }
+                            return;
+                        }
+                        if (data && data.status === 'paid') {
+                            if (btn) {
+                                btn.textContent = 'PAID';
+                                btn.disabled = true;
+                            }
+                            return;
+                        }
+                    }
+                } catch (e) {}
+                return originalHandleCheckoutReturn.apply(this, arguments);
+            };
+        } else {
+            window.handleCheckoutReturn = async function () {
+                const btn = document.getElementById('place-order-btn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'PLACE ORDER';
+                }
+                try {
+                    const res = await fetch('/api/checkout-status');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data && data.status === 'processing') {
+                        if (btn) {
+                            btn.textContent = 'RESUME PAYMENT';
+                            btn.disabled = false;
+                        }
+                        return;
+                    }
+                    if (data && data.status === 'paid' && btn) {
+                        btn.textContent = 'PAID';
+                        btn.disabled = true;
+                    }
+                } catch (e) {}
+            };
+        }
+    });
+})();
