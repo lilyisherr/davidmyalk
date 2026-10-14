@@ -9,8 +9,29 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
+const JWT_SECRET = process.env.SESSION_SECRET;
+const ADMIN_ROLES = new Set(['admin', 'owner']);
+const PUBLIC_SETTING_KEYS = [
+    'contact_email', 'free_shipping_threshold', 'low_stock_threshold',
+    'hero_title', 'hero_subtitle', 'hero_cta_text',
+    'newsletter_enabled', 'newsletter_title', 'newsletter_subtitle',
+    'banner_enabled', 'banner_text', 'banner_link', 'banner_color'
+];
+const ADMIN_SETTING_KEYS = [
+    'contact_email', 'shipping_cost', 'free_shipping_threshold', 'tax_enabled', 'tax_rate',
+    'min_order_amount', 'order_prefix', 'order_processing_days', 'order_shipping_days',
+    'low_stock_threshold', 'auto_reduce_stock', 'auto_deactivate_on_zero_stock',
+    'allow_backorders', 'show_low_stock_to_customers', 'show_out_of_stock_products',
+    'guest_checkout_enabled', 'checkout_terms_enabled', 'checkout_terms_text',
+    'admin_notification_email', 'order_notification_enabled', 'low_stock_alert_enabled',
+    'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from_name',
+    'smtp_from_email', 'contact_form_email',
+    'email_order_confirmation_enabled', 'email_order_confirmation_subject', 'email_order_confirmation_body',
+    'email_order_shipped_enabled', 'email_order_shipped_subject', 'email_order_shipped_body',
+    'email_contact_auto_reply_enabled', 'email_contact_auto_reply_subject', 'email_contact_auto_reply_body'
+];
 
 // Support Vercel/Neon environment variable names alongside standard DATABASE_URL
 const dbUrl = process.env.DATABASE_URL
@@ -22,7 +43,6 @@ const pool = dbUrl ? new Pool({ connectionString: dbUrl }) : null;
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Security headers for production
 app.use((req, res, next) => {
@@ -31,6 +51,7 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    if (req.path.startsWith('/api/admin')) res.setHeader('Cache-Control', 'no-store');
     next();
 });
 
@@ -76,6 +97,8 @@ async function initDb() {
             image_url VARCHAR(500) DEFAULT '',
             category VARCHAR(100) DEFAULT '',
             stock INTEGER DEFAULT 0,
+            product_images JSONB DEFAULT '[]',
+            size_inventory JSONB DEFAULT '{}',
             is_active BOOLEAN DEFAULT true,
             created_at TIMESTAMP DEFAULT NOW()
         );
@@ -178,6 +201,10 @@ async function initDb() {
             created_at TIMESTAMP DEFAULT NOW()
         );
     `);
+    await pool.query(`
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
+    `);
 
     // Basic migrations left out for brevity in this serverless-friendly copy
 }
@@ -185,7 +212,7 @@ async function initDb() {
 // ─── AUTH MIDDLEWARE ───────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
     const token = req.cookies.auth_token;
-    if (!token) { req.user = null; return next(); }
+    if (!token || !JWT_SECRET) { req.user = null; return next(); }
     try { req.user = jwt.verify(token, JWT_SECRET); }
     catch { req.user = null; }
     next();
@@ -194,12 +221,312 @@ function requireAuth(req, res, next) {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
     next();
 }
-function requireAdmin(req, res, next) {
-    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'owner'))
+async function requireAdmin(req, res, next) {
+    if (!req.user || !ADMIN_ROLES.has(req.user.role))
         return res.status(403).json({ error: 'Forbidden' });
-    next();
+    if (!pool) return res.status(503).json({ error: 'Admin services are unavailable.' });
+    try {
+        const result = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+        if (!result.rows.length || !ADMIN_ROLES.has(result.rows[0].role))
+            return res.status(403).json({ error: 'Forbidden' });
+        req.user.role = result.rows[0].role;
+        next();
+    } catch (error) {
+        console.error('Admin authorization error:', error.message);
+        res.status(503).json({ error: 'Admin services are unavailable.' });
+    }
 }
 app.use(authMiddleware);
+app.use('/api/admin', requireAdmin);
+
+function safeUser(user) {
+    return {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        role: user.role
+    };
+}
+
+function setAuthCookie(req, res, user) {
+    const token = jwt.sign(safeUser(user), JWT_SECRET, { expiresIn: '12h' });
+    res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' || req.secure,
+        sameSite: 'lax',
+        maxAge: 12 * 60 * 60 * 1000,
+        path: '/'
+    });
+}
+
+async function readSettings(keys) {
+    if (!pool || !keys.length) return {};
+    const result = await pool.query('SELECT key, value FROM settings WHERE key = ANY($1::text[])', [keys]);
+    return Object.fromEntries(result.rows.map(row => [row.key, row.value]));
+}
+
+function validEmail(email) {
+    return typeof email === 'string' && email.length <= 255
+        && /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(email);
+}
+
+const rateLimitBuckets = new Map();
+function rateLimit(limit, windowMs) {
+    return (req, res, next) => {
+        const now = Date.now();
+        const key = `${req.method}:${req.path}:${req.ip || req.socket.remoteAddress}`;
+        let bucket = rateLimitBuckets.get(key);
+        if (!bucket || now - bucket.startedAt >= windowMs) {
+            bucket = { startedAt: now, count: 0 };
+            rateLimitBuckets.set(key, bucket);
+        }
+        if (bucket.count >= limit) {
+            res.setHeader('Retry-After', Math.ceil((windowMs - (now - bucket.startedAt)) / 1000));
+            return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+        }
+        bucket.count += 1;
+        if (rateLimitBuckets.size > 5000) {
+            for (const [bucketKey, value] of rateLimitBuckets) {
+                if (now - value.startedAt >= windowMs) rateLimitBuckets.delete(bucketKey);
+            }
+        }
+        next();
+    };
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+
+app.post('/api/auth/login', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    if (!JWT_SECRET) return res.status(503).json({ error: 'Sign in is not configured on this server.' });
+    if (!pool) return res.status(503).json({ error: 'Account services are temporarily unavailable.' });
+    const body = req.body || {};
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!validEmail(email) || !password) return res.status(400).json({ error: 'Enter a valid email and password.' });
+    try {
+        const result = await pool.query(
+            'SELECT id, email, password_hash, first_name, last_name, role FROM users WHERE email = $1',
+            [email]
+        );
+        const user = result.rows[0];
+        if (!user || !await bcrypt.compare(password, user.password_hash))
+            return res.status(401).json({ error: 'Email or password is incorrect.' });
+        setAuthCookie(req, res, user);
+        res.json({ user: safeUser(user) });
+    } catch (error) {
+        console.error('Login error:', error.message);
+        res.status(500).json({ error: 'Unable to sign in right now.' });
+    }
+});
+
+app.post('/api/auth/signup', rateLimit(8, 60 * 60 * 1000), async (req, res) => {
+    if (!JWT_SECRET) return res.status(503).json({ error: 'Account creation is not configured on this server.' });
+    if (!pool) return res.status(503).json({ error: 'Account services are temporarily unavailable.' });
+    const body = req.body || {};
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+    const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
+    if (!validEmail(email) || password.length < 12 || password.length > 128
+        || !firstName || firstName.length > 100 || !lastName || lastName.length > 100) {
+        return res.status(400).json({ error: 'Enter a valid name and email, and use a password of at least 12 characters.' });
+    }
+    try {
+        const passwordHash = await bcrypt.hash(password, 12);
+        const role = process.env.BOOTSTRAP_ADMIN_EMAIL
+            && email === process.env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase()
+            ? 'owner'
+            : 'customer';
+        const result = await pool.query(
+            'INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role',
+            [email, passwordHash, firstName, lastName, role]
+        );
+        const user = result.rows[0];
+        setAuthCookie(req, res, user);
+        res.status(201).json({ user: safeUser(user) });
+    } catch (error) {
+        if (error.code === '23505') return res.status(409).json({ error: 'An account with this email already exists.' });
+        console.error('Signup error:', error.message);
+        res.status(500).json({ error: 'Unable to create your account right now.' });
+    }
+});
+
+app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? safeUser(req.user) : null }));
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' || req.secure,
+        sameSite: 'lax',
+        path: '/'
+    });
+    res.json({ ok: true });
+});
+
+app.get('/api/settings/all', async (req, res) => {
+    try { res.json(await readSettings(PUBLIC_SETTING_KEYS)); }
+    catch (error) {
+        console.error('Public settings error:', error.message);
+        res.status(500).json({ error: 'Unable to load store settings.' });
+    }
+});
+
+app.get('/api/settings/shipping', async (req, res) => {
+    try {
+        const settings = await readSettings(['shipping_cost', 'free_shipping_threshold']);
+        res.json({
+            shippingCost: Number.parseFloat(settings.shipping_cost) || 0,
+            freeShippingThreshold: Number.parseFloat(settings.free_shipping_threshold) || 0
+        });
+    } catch (error) {
+        console.error('Shipping settings error:', error.message);
+        res.status(500).json({ error: 'Unable to load shipping settings.' });
+    }
+});
+
+app.get('/api/settings/grind', async (req, res) => {
+    try {
+        const settings = await readSettings(['grind_title', 'grind_text', 'grind_quote', 'grind_image', 'grind_link_url', 'grind_link_text']);
+        res.json({
+            title: settings.grind_title || '',
+            text: settings.grind_text || '',
+            quote: settings.grind_quote || '',
+            image: settings.grind_image || '',
+            linkUrl: settings.grind_link_url || '',
+            linkText: settings.grind_link_text || ''
+        });
+    } catch (error) {
+        console.error('Story settings error:', error.message);
+        res.status(500).json({ error: 'Unable to load store content.' });
+    }
+});
+
+app.get('/api/settings/socials', async (req, res) => {
+    try {
+        const settings = await readSettings(['socials']);
+        let socials = [];
+        if (settings.socials) {
+            try {
+                const parsed = JSON.parse(settings.socials);
+                if (Array.isArray(parsed)) {
+                    socials = parsed.filter(item => item && typeof item === 'object').map(item => ({
+                        name: typeof item.name === 'string' ? item.name.slice(0, 40) : '',
+                        icon: typeof item.icon === 'string' ? item.icon.slice(0, 30) : '',
+                        enabled: item.enabled === true || item.enabled === 'true',
+                        url: typeof item.url === 'string' && /^https:\/\/[^\s]+$/i.test(item.url) ? item.url : ''
+                    })).filter(item => item.name && item.url);
+                }
+            } catch (error) {
+                console.error('Invalid social settings JSON:', error.message);
+            }
+        }
+        res.json(socials);
+    } catch (error) {
+        console.error('Social settings error:', error.message);
+        res.status(500).json({ error: 'Unable to load social links.' });
+    }
+});
+
+app.get('/api/admin/settings', async (req, res) => {
+    try { res.json(await readSettings(ADMIN_SETTING_KEYS)); }
+    catch (error) {
+        console.error('Admin settings error:', error.message);
+        res.status(500).json({ error: 'Unable to load settings.' });
+    }
+});
+
+app.put('/api/admin/settings/bulk', async (req, res) => {
+    if (!pool) return res.status(503).json({ error: 'Settings storage is unavailable.' });
+    const settings = req.body && req.body.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings))
+        return res.status(400).json({ error: 'Provide settings to save.' });
+    const entries = Object.entries(settings);
+    if (!entries.length || entries.some(([key, value]) =>
+        !ADMIN_SETTING_KEYS.includes(key) || key === 'smtp_pass'
+        || (typeof value !== 'string' && typeof value !== 'boolean' && typeof value !== 'number')
+        || String(value).length > 10000)) {
+        return res.status(400).json({ error: 'One or more settings are not allowed or are too long.' });
+    }
+    try {
+        for (const [key, value] of entries) {
+            await pool.query(
+                'INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()',
+                [key, String(value)]
+            );
+        }
+        await adminLog(req, 'update_settings', `Updated ${entries.length} store setting(s)`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Save settings error:', error.message);
+        res.status(500).json({ error: 'Unable to save settings.' });
+    }
+});
+
+app.post('/api/admin/email/test', async (req, res) => {
+    try {
+        const settings = await getSmtpSettings();
+        const recipient = settings.admin_notification_email || process.env.SMTP_USER;
+        if (!recipient) return res.status(503).json({ error: 'Set SMTP_USER or an admin notification email first.' });
+        const sent = await sendEmail({
+            to: recipient,
+            subject: 'Store email test',
+            text: 'Your store email settings are working.'
+        });
+        if (!sent) return res.status(503).json({ error: 'Email could not be sent. Check the email setup and server logs.' });
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Test email error:', error.message);
+        res.status(500).json({ error: 'Unable to send a test email right now.' });
+    }
+});
+
+app.post('/api/contact', rateLimit(5, 15 * 60 * 1000), async (req, res) => {
+    if (!pool) return res.status(503).json({ error: 'The contact form is temporarily unavailable. Please email us directly.' });
+    const { name, email, subject, message, orderNumber } = req.body || {};
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 255
+        || !validEmail(email) || typeof message !== 'string' || !message.trim() || message.trim().length > 10000
+        || (subject !== undefined && (typeof subject !== 'string' || subject.length > 500))
+        || (orderNumber !== undefined && (typeof orderNumber !== 'string' || orderNumber.length > 100))) {
+        return res.status(400).json({ error: 'Please check the name, email, and message fields.' });
+    }
+    try {
+        const safeSubject = (subject || 'General question').replace(/[\r\n]+/g, ' ').trim().slice(0, 120);
+        const saved = await pool.query(
+            'INSERT INTO contact_submissions (name, email, subject, message, order_number) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            [name.trim(), email.trim().toLowerCase(), (subject || '').trim(), message.trim(), (orderNumber || '').trim()]
+        );
+        const settings = await getSmtpSettings();
+        const recipient = process.env.CONTACT_FORM_EMAIL || settings.contact_form_email || settings.smtp_user;
+        if (!recipient || !await sendEmail({
+            to: recipient,
+            subject: `New contact form message: ${safeSubject}`,
+            replyTo: email.trim().toLowerCase(),
+            text: `From: ${name.trim()} <${email.trim()}>\nOrder number: ${(orderNumber || 'Not provided').trim()}\n\n${message.trim()}`
+        })) {
+            console.error(`Contact submission ${saved.rows[0].id} saved but notification email was not sent.`);
+            return res.status(503).json({ error: 'Your message was saved, but email delivery is not configured. Please use the contact email shown on this site.' });
+        }
+        const template = settings.email_contact_auto_reply_body;
+        if (settings.email_contact_auto_reply_enabled === 'true' && template) {
+            const reply = template
+                .replace(/\{\{customer_name\}\}/g, name.trim())
+                .replace(/\{\{subject\}\}/g, (subject || '').trim());
+            await sendEmail({
+                to: email.trim(),
+                subject: settings.email_contact_auto_reply_subject || 'We received your message',
+                text: reply
+            });
+        }
+        res.status(201).json({ ok: true });
+    } catch (error) {
+        console.error('Contact form error:', error.message);
+        res.status(500).json({ error: 'Unable to send your message right now.' });
+    }
+});
 
 // minimal admin log helper for serverless safety
 async function adminLog(req, action, details) {
@@ -213,9 +540,20 @@ async function adminLog(req, action, details) {
 // email helper (unchanged)
 async function getSmtpSettings() {
     if (!pool) return {};
-    const r = await pool.query("SELECT key, value FROM settings WHERE key LIKE 'smtp_%'");
-    const s = {};
-    r.rows.forEach(row => { s[row.key] = row.value; });
+    const keys = [
+        'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from_name',
+        'smtp_from_email', 'contact_form_email', 'admin_notification_email',
+        'email_contact_auto_reply_enabled', 'email_contact_auto_reply_subject',
+        'email_contact_auto_reply_body'
+    ];
+    const s = await readSettings(keys);
+    s.smtp_host = process.env.SMTP_HOST || s.smtp_host || 'smtp.gmail.com';
+    s.smtp_port = process.env.SMTP_PORT || s.smtp_port || '587';
+    s.smtp_secure = process.env.SMTP_SECURE || s.smtp_secure || 'false';
+    s.smtp_user = process.env.SMTP_USER || s.smtp_user || '';
+    s.smtp_pass = process.env.SMTP_PASS || '';
+    s.smtp_from_name = process.env.SMTP_FROM_NAME || s.smtp_from_name || 'David Myalik Store';
+    s.smtp_from_email = process.env.SMTP_FROM_EMAIL || s.smtp_from_email || s.smtp_user;
     return s;
 }
 function buildTransporter(s) {
@@ -227,21 +565,66 @@ function buildTransporter(s) {
         auth: { user: s.smtp_user, pass: s.smtp_pass }
     });
 }
-async function sendEmail({ to, subject, text, html }) {
+async function sendEmail({ to, subject, text, html, replyTo }) {
     try {
         const s = await getSmtpSettings();
         const transporter = buildTransporter(s);
         if (!transporter) return false;
         await transporter.sendMail({
             from: `"${s.smtp_from_name || 'David Myalik Store'}" <${s.smtp_from_email || s.smtp_user}>`,
-            to, subject, text, html: html || `<pre style="font-family:sans-serif;white-space:pre-wrap;">${text}</pre>`
+            to, subject, text, replyTo,
+            html: html || `<pre style="font-family:sans-serif;white-space:pre-wrap;">${escapeHtml(text)}</pre>`
         });
         return true;
     } catch (e) { console.error('Email send error:', e && e.message); return false; }
 }
 
 // ─── SIMPLE ROUTES USED BY FRONTEND ──────────────────────────────────────
-app.get('/api/health', (req, res) => res.json({ ok: true, env: process.env.NODE_ENV || 'development' }));
+async function serveAdminPage(req, res, next) {
+    if (!req.user || !ADMIN_ROLES.has(req.user.role))
+        return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+    if (!pool) return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+    try {
+        const result = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+        if (!result.rows.length || !ADMIN_ROLES.has(result.rows[0].role))
+            return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+    } catch (error) {
+        console.error('Admin page authorization error:', error.message);
+        return res.status(503).sendFile(path.join(__dirname, 'public', '500.html'));
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+}
+app.get('/admin', serveAdminPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+app.get('/admin.html', serveAdminPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+function serveDashboardPage(req, res, next) {
+    if (!req.user) return res.redirect('/login');
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+}
+app.get('/dashboard', serveDashboardPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+app.get('/dashboard.html', serveDashboardPage, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/store-stats', async (req, res) => {
+    if (!pool) return res.status(503).json({ error: 'Store statistics are unavailable.' });
+    try {
+        const result = await pool.query("SELECT COUNT(*)::integer AS count FROM orders WHERE status IN ('shipped', 'delivered')");
+        res.json({ ordersShipped: result.rows[0].count });
+    } catch (error) {
+        console.error('Store stats error:', error.message);
+        res.status(500).json({ error: 'Unable to load store statistics.' });
+    }
+});
 
 // Upload endpoint — serverless-friendly (writes to /tmp on Vercel)
 app.post('/api/admin/upload', upload.single('image'), (req, res) => {
@@ -266,7 +649,7 @@ app.get('/api/checkout-status', async (req, res) => {
         const sessionId = req.query.session_id;
         if (!sessionId) return res.json({ status: 'unknown' });
         if (!pool) return res.json({ status: 'unknown' });
-        const r = await pool.query('SELECT * FROM orders WHERE stripe_session_id = $1', [sessionId]);
+        const r = await pool.query('SELECT status FROM orders WHERE stripe_session_id = $1', [sessionId]);
         if (!r.rows.length) return res.json({ status: 'not_found' });
         const order = r.rows[0];
         return res.json({ status: order.status });
@@ -288,7 +671,9 @@ app.post('/api/checkout/cancel', async (req, res) => {
 app.get('/api/products', async (req, res) => {
     try {
         if (!pool) return res.json([]);
-        const r = await pool.query('SELECT * FROM products WHERE is_active = true ORDER BY created_at DESC');
+        const r = await pool.query(
+            'SELECT id, name, description, price, sale_price, image_url, category, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
+        );
         res.json(r.rows);
     } catch (err) { console.error(err.message); res.status(500).json({ error: 'Server error' }); }
 });
