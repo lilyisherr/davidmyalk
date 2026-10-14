@@ -456,7 +456,7 @@
                 <div class="table-wrapper">
                     <table>
                         <thead>
-                            <tr><th>User</th><th>Email</th><th>Role</th><th>Orders</th><th>Joined</th><th>Actions</th></tr>
+                            <tr><th>User</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr>
                         </thead>
                         <tbody id="users-table"></tbody>
                     </table>
@@ -1692,12 +1692,15 @@
         async function loadLogs() {
             try {
                 const res = await fetch('/api/admin/logs');
-                if (!res.ok) throw new Error('Activity log request failed.');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `Activity log request failed (${res.status}).`);
+                }
                 allLogs = await res.json();
                 renderLogs(allLogs);
             } catch (error) {
                 console.error('Unable to load activity log:', error);
-                document.getElementById('logs-list').innerHTML = '<div class="empty-state"><p>Activity could not be loaded. Refresh and try again.</p></div>';
+                document.getElementById('logs-list').innerHTML = `<div class="empty-state"><p>${escapeAdminText(error.message || 'Activity could not be loaded. Refresh and try again.')}</p></div>`;
             }
         }
 
@@ -2401,14 +2404,19 @@
             const el = document.getElementById('orders-last-updated');
             try {
                 const res = await fetch('/api/admin/orders');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `Orders request failed (${res.status}).`);
+                }
                 const orders = await res.json();
                 allOrders = orders;
                 renderOrders(allOrders);
                 renderRecentOrders(allOrders);
                 const now = new Date();
                 if (el) el.innerHTML = `<span class="live-dot"></span>Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
-            } catch(e) {
-                if (el && !silent) el.textContent = 'Failed to load';
+            } catch(error) {
+                console.error('Unable to load admin orders:', error);
+                if (el && !silent) el.textContent = error.message || 'Failed to load';
             }
         }
 
@@ -2491,12 +2499,15 @@
         async function loadUsers() {
             try {
                 const res = await fetch('/api/admin/users');
-                if (!res.ok) throw new Error('Users request failed.');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `Users request failed (${res.status}).`);
+                }
                 allUsers = await res.json();
                 renderUsers(allUsers);
             } catch (error) {
                 console.error('Unable to load users:', error);
-                document.getElementById('users-table').innerHTML = '<tr><td colspan="6" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">Users could not be loaded. Refresh and try again.</td></tr>';
+                document.getElementById('users-table').innerHTML = `<tr><td colspan="5" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">${escapeAdminText(error.message || 'Users could not be loaded. Refresh and try again.')}</td></tr>`;
             }
         }
 
@@ -2520,7 +2531,6 @@
                 </div></td>
                 <td class="font-mono text-xs">${escapeAdminText(u.email)}</td>
                 <td><span class="badge badge-${escapeAdminText(role === 'owner' ? 'admin' : role)}">${escapeAdminText(role)}</span></td>
-                <td class="font-mono">${Number(u.order_count) || 0}</td>
                 <td class="font-mono text-xs">${new Date(u.created_at).toLocaleDateString()}</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="viewUser(${Number(u.id)})">VIEW</button>
