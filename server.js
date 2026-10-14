@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
 const path = require('path');
+const crypto = require('crypto');
 const multer = require('multer');
-const fs = require('fs');
 const nodemailer = require('nodemailer');
 
 const app = express();
@@ -58,21 +58,9 @@ app.use((req, res, next) => {
     next();
 });
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        // Use /tmp on serverless platforms (Vercel) to avoid write errors
-        const useTmp = !!process.env.VERCEL;
-        const dir = useTmp ? path.join(__dirname, 'tmp', 'uploads') : path.join(__dirname, 'public', 'uploads');
-        try { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); } catch (e) { console.error('Upload dir create error:', e.message); }
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, Date.now() + '-' + Math.random().toString(36).slice(2) + ext);
-    }
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) return cb(new Error('Only image uploads are allowed'));
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'].includes(file.mimetype))
+        return cb(new Error('Upload a JPG, PNG, GIF, WebP, or AVIF image.'));
     cb(null, true);
 } });
 
@@ -203,6 +191,12 @@ async function initDb() {
             is_approved BOOLEAN DEFAULT false,
             created_at TIMESTAMP DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS uploaded_images (
+            id UUID PRIMARY KEY,
+            content_type VARCHAR(50) NOT NULL,
+            image_data BYTEA NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
     `);
     await pool.query(`
         ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
@@ -299,7 +293,7 @@ function normalizeProduct(input) {
     if (description.length > 10000 || category.length > 100 || imageUrl.length > 500)
         return { error: 'One or more product fields are too long.' };
     if (typeof input.isActive !== 'boolean') return { error: 'Product visibility must be selected.' };
-    if (!Array.isArray(productImages) || productImages.length > 20
+    if (!Array.isArray(productImages) || productImages.length > 19
         || productImages.some(image => typeof image !== 'string' || image.length > 500))
         return { error: 'Product images must be a list of at most 20 valid image URLs.' };
     if (sizeInventory !== null && (typeof sizeInventory !== 'object' || Array.isArray(sizeInventory)
@@ -1019,24 +1013,51 @@ app.get('/dashboard', serveDashboardPage, (req, res) => {
 app.get('/dashboard.html', serveDashboardPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
+app.get('/shop', (req, res) => res.redirect(301, '/shop.html'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
-// Upload endpoint — serverless-friendly (writes to /tmp on Vercel)
-app.post('/api/admin/upload', upload.single('image'), (req, res) => {
+app.post('/api/admin/upload', (req, res, next) => {
+    upload.single('image')(req, res, error => {
+        if (!error) return next();
+        return res.status(400).json({ error: error.message || 'Unable to process image upload.' });
+    });
+}, async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // Build a reachable URL. On Vercel use VERCEL_URL env if available.
-    const filePath = `/uploads/${req.file.filename}`;
-    const base = process.env.APP_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `${req.protocol}://${req.get('host')}`);
-    const fullUrl = base + filePath;
-    // If file was written to tmp, consider returning a temporary URL and warn that uploads are ephemeral on Vercel
-    if (process.env.VERCEL) {
-        return res.json({ url: fullUrl, ephemeral: true, message: 'On Vercel uploads are stored temporarily and may not persist. Use external storage for production.' });
+    try {
+        const id = crypto.randomUUID();
+        await pool.query(
+            'INSERT INTO uploaded_images (id, content_type, image_data) VALUES ($1, $2, $3)',
+            [id, req.file.mimetype, req.file.buffer]
+        );
+        res.status(201).json({ url: `/api/product-images/${id}` });
+    } catch (error) {
+        console.error('Product image upload error:', error.message);
+        res.status(500).json({ error: 'Unable to save this image. Please try again.' });
     }
-    res.json({ url: fullUrl });
 });
 
-// Simple static file fallback for uploaded assets when running locally
+app.get('/api/product-images/:id', async (req, res) => {
+    if (!pool) return res.status(503).end();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id))
+        return res.status(404).end();
+    try {
+        const result = await pool.query(
+            'SELECT content_type, image_data FROM uploaded_images WHERE id = $1',
+            [req.params.id]
+        );
+        if (!result.rows.length) return res.status(404).end();
+        const image = result.rows[0];
+        res.setHeader('Content-Type', image.content_type);
+        res.setHeader('Content-Length', image.image_data.length);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.end(image.image_data);
+    } catch (error) {
+        console.error('Product image fetch error:', error.message);
+        res.status(500).end();
+    }
+});
+
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Provide a lightweight /api/checkout-status to let frontend poll
