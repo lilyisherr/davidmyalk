@@ -1337,6 +1337,7 @@
             grid.innerHTML = '<div class="pdm-no-reviews" style="opacity:0.5;">Loading reviews...</div>';
             try {
                 const res = await fetch('/api/reviews');
+                if (!res.ok) throw new Error('Reviews request failed.');
                 const reviews = await res.json();
                 if (!reviews.length) {
                     grid.innerHTML = '<div class="pdm-no-reviews">No reviews yet — be the first after your order.</div>';
@@ -1355,15 +1356,16 @@
                     ratingRow.innerHTML = `<span class="pdm-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span><span class="pdm-review-count">${avgRounded} · ${reviews.length} review${reviews.length !== 1 ? 's' : ''}</span>`;
                 }
                 grid.innerHTML = reviews.map(r => {
-                    const initials = r.reviewer_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                    const reviewerName = String(r.reviewer_name || '');
+                    const initials = reviewerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
                     return `<div class="pdm-review-card">
                         <div class="pdm-review-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-                        <p class="pdm-review-text">"${r.review_text.replace(/"/g, '&quot;')}"</p>
+                        <p class="pdm-review-text">"${escapeStoreHtml(r.review_text)}"</p>
                         <div class="pdm-review-author">
-                            <div class="pdm-review-avatar">${initials}</div>
+                            <div class="pdm-review-avatar">${escapeStoreHtml(initials)}</div>
                             <div>
-                                <div class="pdm-review-name">${r.reviewer_name.toUpperCase()}</div>
-                                ${r.reviewer_location ? `<div class="pdm-review-loc">${r.reviewer_location.toUpperCase()}</div>` : ''}
+                                <div class="pdm-review-name">${escapeStoreHtml(reviewerName.toUpperCase())}</div>
+                                ${r.reviewer_location ? `<div class="pdm-review-loc">${escapeStoreHtml(String(r.reviewer_location).toUpperCase())}</div>` : ''}
                             </div>
                         </div>
                     </div>`;

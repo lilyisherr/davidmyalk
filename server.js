@@ -105,6 +105,7 @@ async function initDb() {
             id SERIAL PRIMARY KEY,
             order_number VARCHAR(50) UNIQUE NOT NULL,
             user_id INTEGER REFERENCES users(id),
+            customer_email VARCHAR(255) DEFAULT '',
             status VARCHAR(50) DEFAULT 'pending',
             subtotal DECIMAL(10,2) DEFAULT 0,
             shipping_cost DECIMAL(10,2) DEFAULT 0,
@@ -213,6 +214,7 @@ async function initDb() {
         ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT '';
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255) DEFAULT '';
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code VARCHAR(50) DEFAULT '';
         UPDATE products
@@ -369,7 +371,8 @@ const rateLimitBuckets = new Map();
 function rateLimit(limit, windowMs) {
     return (req, res, next) => {
         const now = Date.now();
-        const key = `${req.method}:${req.path}:${req.ip || req.socket.remoteAddress}`;
+        const routePath = req.route && req.route.path ? req.route.path : req.path;
+        const key = `${req.method}:${req.baseUrl || ''}${routePath}:${req.ip || req.socket.remoteAddress}`;
         let bucket = rateLimitBuckets.get(key);
         if (!bucket || now - bucket.startedAt >= windowMs) {
             bucket = { startedAt: now, count: 0 };
@@ -447,6 +450,70 @@ app.post('/api/auth/signup', rateLimit(8, 60 * 60 * 1000), async (req, res) => {
         if (error.code === '23505') return res.status(409).json({ error: 'An account with this email already exists.' });
         console.error('Signup error:', error.message);
         res.status(500).json({ error: 'Unable to create your account right now.' });
+    }
+});
+
+const PASSWORD_RESET_MESSAGE = 'If an account with that email exists, a password reset link will be sent shortly.';
+app.post('/api/auth/forgot-password', rateLimit(5, 60 * 60 * 1000), async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!validEmail(email)) return res.status(200).json({ message: PASSWORD_RESET_MESSAGE });
+    if (!pool) return res.status(503).json({ error: 'Password reset is temporarily unavailable.' });
+    try {
+        const result = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (result.rows.length) {
+            const userId = result.rows[0].id;
+            const token = crypto.randomBytes(32).toString('hex');
+            const storedToken = crypto.createHash('sha256').update(token).digest('hex');
+            await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+            await pool.query(
+                'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'1 hour\')',
+                [userId, storedToken]
+            );
+            const baseUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+            const link = `${baseUrl}/forgot-password?token=${encodeURIComponent(token)}`;
+            const sent = await sendEmail({
+                to: email,
+                subject: 'Reset your DAVID MYALIK password',
+                text: `We received a request to reset your password. Open this link within one hour to choose a new password:\n\n${link}\n\nIf you did not request this, you can ignore this email.`
+            });
+            if (!sent) console.error('Password reset email could not be delivered.');
+        }
+        res.json({ message: PASSWORD_RESET_MESSAGE });
+    } catch (error) {
+        console.error('Password reset request error:', error.message);
+        res.json({ message: PASSWORD_RESET_MESSAGE });
+    }
+});
+
+app.post('/api/auth/reset-password', rateLimit(10, 60 * 60 * 1000), async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!/^[a-f0-9]{64}$/i.test(token) || password.length < 12 || password.length > 128)
+        return res.status(400).json({ error: 'Use a valid reset link and a password of at least 12 characters.' });
+    let client;
+    try {
+        const storedToken = crypto.createHash('sha256').update(token).digest('hex');
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const result = await client.query(
+            'SELECT id, user_id FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() FOR UPDATE',
+            [storedToken]
+        );
+        if (!result.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'This reset link is invalid or expired. Request a new one.' });
+        }
+        const passwordHash = await bcrypt.hash(password, 12);
+        await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, result.rows[0].user_id]);
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [result.rows[0].user_id]);
+        await client.query('COMMIT');
+        res.json({ ok: true });
+    } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
+        console.error('Password reset error:', error.message);
+        res.status(500).json({ error: 'Unable to reset your password right now.' });
+    } finally {
+        if (client) client.release();
     }
 });
 
@@ -870,13 +937,14 @@ app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
 
         const orderResult = await pool.query(`
             INSERT INTO orders
-                (order_number, user_id, status, subtotal, shipping_cost, total,
+                (order_number, user_id, status, subtotal, shipping_cost, total, customer_email,
                  shipping_first_name, shipping_last_name, shipping_address, shipping_city,
                  shipping_state, shipping_zip, shipping_country, discount_amount, discount_code, items)
-            VALUES ($1, $2, 'pending_payment', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
+            VALUES ($1, $2, 'pending_payment', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
             RETURNING id
         `, [
             orderNumber, req.user ? req.user.id : null, subtotal, shippingCost, total,
+            req.user ? req.user.email : '',
             shipping.fields.first_name, shipping.fields.last_name, shipping.fields.address_line1,
             shipping.fields.city, shipping.fields.state, shipping.fields.zip, shipping.fields.country,
             discount.amount, discount.code, JSON.stringify(orderItems)
@@ -937,6 +1005,15 @@ async function finalizePaidOrder(session, userId = null, fromWebhook = false) {
             || session.currency !== 'usd')
             throw Object.assign(new Error('Payment details do not match this order.'), { status: 409 });
         if (order.status === 'pending_payment') {
+            const paidEmail = typeof session.customer_details?.email === 'string'
+                ? session.customer_details.email.trim().toLowerCase()
+                : '';
+            if (paidEmail) {
+                await client.query(
+                    'UPDATE orders SET customer_email = $1 WHERE id = $2 AND customer_email = $3',
+                    [paidEmail, order.id, '']
+                );
+            }
             const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
             let inventoryIssue = false;
             for (const item of items) {
@@ -1088,6 +1165,314 @@ app.get('/api/admin/settings', async (req, res) => {
     catch (error) {
         console.error('Admin settings error:', error.message);
         res.status(500).json({ error: 'Unable to load settings.' });
+    }
+});
+
+app.get('/api/admin/stripe-status', (req, res) => {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    res.json({
+        configured: Boolean(stripe),
+        mode: key.startsWith('sk_live_') ? 'live' : key.startsWith('sk_test_') ? 'test' : null,
+        webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET)
+    });
+});
+
+app.put('/api/admin/settings/socials', async (req, res) => {
+    const allowedIcons = new Set(['youtube', 'instagram', 'twitter', 'discord', 'tiktok', 'facebook']);
+    const socials = req.body && req.body.socials;
+    if (!Array.isArray(socials) || socials.length > 20)
+        return res.status(400).json({ error: 'Provide a list of up to 20 social links.' });
+    const normalized = [];
+    for (const item of socials) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+            || typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 40
+            || typeof item.icon !== 'string' || !allowedIcons.has(item.icon)
+            || typeof item.url !== 'string' || item.url.length > 500
+            || (item.enabled !== true && item.enabled !== false)) {
+            return res.status(400).json({ error: 'One or more social links are invalid.' });
+        }
+        let url = '';
+        if (item.url.trim()) {
+            try {
+                const parsed = new URL(item.url.trim());
+                if (parsed.protocol !== 'https:') throw new Error('Use secure HTTPS links.');
+                url = parsed.href;
+            } catch {
+                return res.status(400).json({ error: 'Social links must be valid HTTPS URLs.' });
+            }
+        }
+        normalized.push({ name: item.name.trim(), icon: item.icon, url, enabled: item.enabled });
+    }
+    try {
+        await pool.query(
+            `INSERT INTO settings (key, value, updated_at) VALUES ('socials', $1, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+            [JSON.stringify(normalized)]
+        );
+        await adminLog(req, 'update_socials', `Updated ${normalized.length} social link(s)`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Save social links error:', error.message);
+        res.status(500).json({ error: 'Unable to save social links.' });
+    }
+});
+
+app.put('/api/admin/settings/grind', async (req, res) => {
+    const body = req.body || {};
+    const fields = {
+        grind_title: [body.title, 100],
+        grind_text: [body.text, 10000],
+        grind_quote: [body.quote, 1000],
+        grind_image: [body.image, 500],
+        grind_link_url: [body.linkUrl, 500],
+        grind_link_text: [body.linkText, 80]
+    };
+    for (const [value, max] of Object.values(fields)) {
+        if (typeof value !== 'string' || value.length > max)
+            return res.status(400).json({ error: 'One or more story section fields are invalid or too long.' });
+    }
+    const image = body.image.trim();
+    const link = body.linkUrl.trim();
+    const safeLocalOrHttps = value => !value
+        || (/^\/(?!\/)[^\s\\]*$/.test(value))
+        || /^https:\/\/[^\s]+$/i.test(value);
+    if (!safeLocalOrHttps(image) || !safeLocalOrHttps(link))
+        return res.status(400).json({ error: 'Story links and images must use HTTPS or a local site path.' });
+    try {
+        for (const [key, [value]] of Object.entries(fields)) {
+            await pool.query(
+                'INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()',
+                [key, value.trim()]
+            );
+        }
+        await adminLog(req, 'update_story_section', 'Updated the storefront story section');
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Save story section error:', error.message);
+        res.status(500).json({ error: 'Unable to save the story section.' });
+    }
+});
+
+app.get('/api/admin/reviews', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at FROM product_reviews ORDER BY created_at DESC, id DESC');
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin reviews error:', error.message);
+        res.status(500).json({ error: 'Unable to load reviews.' });
+    }
+});
+
+function normalizeReview(input) {
+    const body = input || {};
+    const name = typeof body.reviewer_name === 'string' ? body.reviewer_name.trim() : '';
+    const location = typeof body.reviewer_location === 'string' ? body.reviewer_location.trim() : '';
+    const text = typeof body.review_text === 'string' ? body.review_text.trim() : '';
+    const rating = Number(body.rating);
+    if (!name || name.length > 255 || location.length > 255 || !text || text.length > 5000
+        || !Number.isInteger(rating) || rating < 1 || rating > 5
+        || typeof body.is_approved !== 'boolean') return null;
+    return [name, location, rating, text, body.is_approved];
+}
+
+app.post('/api/admin/reviews', async (req, res) => {
+    const review = normalizeReview(req.body);
+    if (!review) return res.status(400).json({ error: 'Enter a valid name, review, and 1–5 star rating.' });
+    try {
+        const result = await pool.query(`
+            INSERT INTO product_reviews (reviewer_name, reviewer_location, rating, review_text, is_approved)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at
+        `, review);
+        await adminLog(req, 'review_created', `Created review ID ${result.rows[0].id}`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin review creation error:', error.message);
+        res.status(500).json({ error: 'Unable to save this review.' });
+    }
+});
+
+app.put('/api/admin/reviews/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const review = normalizeReview(req.body);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid review ID.' });
+    if (!review) return res.status(400).json({ error: 'Enter a valid name, review, and 1–5 star rating.' });
+    try {
+        const result = await pool.query(`
+            UPDATE product_reviews
+            SET reviewer_name = $1, reviewer_location = $2, rating = $3, review_text = $4, is_approved = $5
+            WHERE id = $6
+            RETURNING id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at
+        `, [...review, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Review not found.' });
+        await adminLog(req, 'review_updated', `Updated review ID ${id}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin review update error:', error.message);
+        res.status(500).json({ error: 'Unable to update this review.' });
+    }
+});
+
+app.delete('/api/admin/reviews/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid review ID.' });
+    try {
+        const result = await pool.query('DELETE FROM product_reviews WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Review not found.' });
+        await adminLog(req, 'review_deleted', `Deleted review ID ${id}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin review deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete this review.' });
+    }
+});
+
+app.get('/api/admin/contact-submissions', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, name, email, subject, message, order_number, status, created_at FROM contact_submissions ORDER BY created_at DESC, id DESC LIMIT 500');
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin contact list error:', error.message);
+        res.status(500).json({ error: 'Unable to load contact submissions.' });
+    }
+});
+
+app.put('/api/admin/contact-submissions/:id/status', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const status = req.body && req.body.status;
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid submission ID.' });
+    if (!['new', 'read', 'replied'].includes(status)) return res.status(400).json({ error: 'Invalid contact status.' });
+    try {
+        const result = await pool.query(
+            'UPDATE contact_submissions SET status = $1 WHERE id = $2 RETURNING id, status',
+            [status, id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Contact submission not found.' });
+        await adminLog(req, 'contact_status_updated', `Updated contact submission ${id} to ${status}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin contact status error:', error.message);
+        res.status(500).json({ error: 'Unable to update contact status.' });
+    }
+});
+
+app.get('/api/admin/discounts', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, code, type, value, min_order_amount, usage_limit, usage_count, is_active, expires_at, created_at FROM discount_codes ORDER BY created_at DESC, id DESC'
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin discounts error:', error.message);
+        res.status(500).json({ error: 'Unable to load discount codes.' });
+    }
+});
+
+app.post('/api/admin/discounts', async (req, res) => {
+    const body = req.body || {};
+    const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+    const type = body.type;
+    const value = Number(body.value);
+    const minOrderAmount = body.minOrderAmount === undefined ? 0 : Number(body.minOrderAmount);
+    const usageLimit = body.usageLimit === null || body.usageLimit === undefined || body.usageLimit === ''
+        ? null : Number(body.usageLimit);
+    const expiresAt = body.expiresAt || null;
+    if (!/^[A-Z0-9_-]{3,50}$/.test(code) || !['percentage', 'fixed'].includes(type)
+        || !Number.isFinite(value) || value <= 0 || value > (type === 'percentage' ? 100 : 100000)
+        || !Number.isFinite(minOrderAmount) || minOrderAmount < 0 || minOrderAmount > 100000
+        || (usageLimit !== null && (!Number.isInteger(usageLimit) || usageLimit < 1 || usageLimit > 10000000))
+        || (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()))
+        || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) {
+        return res.status(400).json({ error: 'Check the discount code, type, value, minimum order, usage limit, and expiration date.' });
+    }
+    try {
+        const result = await pool.query(`
+            INSERT INTO discount_codes (code, type, value, min_order_amount, usage_limit, is_active, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, code, type, value, min_order_amount, usage_limit, usage_count, is_active, expires_at, created_at
+        `, [code, type, value, minOrderAmount, usageLimit, body.isActive !== false, expiresAt]);
+        await adminLog(req, 'discount_created', `Created discount code ${code}`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        if (error.code === '23505') return res.status(409).json({ error: 'That discount code already exists.' });
+        console.error('Admin discount creation error:', error.message);
+        res.status(500).json({ error: 'Unable to create the discount code.' });
+    }
+});
+
+app.patch('/api/admin/discounts/:id/toggle', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid discount ID.' });
+    try {
+        const result = await pool.query(
+            'UPDATE discount_codes SET is_active = NOT is_active WHERE id = $1 RETURNING id, code, is_active',
+            [id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Discount code not found.' });
+        await adminLog(req, 'discount_toggled', `Changed discount code ${result.rows[0].code} active status`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin discount toggle error:', error.message);
+        res.status(500).json({ error: 'Unable to change the discount status.' });
+    }
+});
+
+app.delete('/api/admin/discounts/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid discount ID.' });
+    try {
+        const result = await pool.query('DELETE FROM discount_codes WHERE id = $1 RETURNING code', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Discount code not found.' });
+        await adminLog(req, 'discount_deleted', `Deleted discount code ${result.rows[0].code}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin discount deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete the discount code.' });
+    }
+});
+
+app.put('/api/admin/orders/:id/status', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const body = req.body || {};
+    const allowedStatuses = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+    const allowedCarriers = new Set(['', 'usps', 'ups', 'fedex', 'dhl', 'other']);
+    const status = typeof body.status === 'string' ? body.status : '';
+    const trackingNumber = typeof body.trackingNumber === 'string' ? body.trackingNumber.trim() : '';
+    const shippingCarrier = typeof body.shippingCarrier === 'string' ? body.shippingCarrier : '';
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID.' });
+    if (!allowedStatuses.has(status) || !allowedCarriers.has(shippingCarrier)
+        || trackingNumber.length > 200 || (trackingNumber && !shippingCarrier)) {
+        return res.status(400).json({ error: 'Check the order status, carrier, and tracking number.' });
+    }
+    try {
+        const result = await pool.query(`
+            UPDATE orders
+            SET status = $1, tracking_number = $2, shipping_carrier = $3, updated_at = NOW()
+            WHERE id = $4
+            RETURNING id, order_number, status, tracking_number, shipping_carrier
+        `, [status, trackingNumber, shippingCarrier, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        await adminLog(req, 'update_order', `Updated order ${result.rows[0].order_number} to ${status}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin order update error:', error.message);
+        res.status(500).json({ error: 'Unable to update this order.' });
+    }
+});
+
+app.delete('/api/admin/orders/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID.' });
+    try {
+        const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING order_number', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        await adminLog(req, 'delete_order', `Deleted order ${result.rows[0].order_number}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin order deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete this order.' });
     }
 });
 
@@ -1326,7 +1711,8 @@ app.get('/api/admin/orders', async (req, res) => {
                    o.shipping_city, o.shipping_state, o.shipping_zip, o.shipping_country,
                    o.tracking_number, o.shipping_carrier,
                    COALESCE(o.items, '[]'::jsonb) AS items, o.created_at, o.updated_at,
-                   u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name
+                   COALESCE(u.email, o.customer_email) AS user_email,
+                   u.first_name AS user_first_name, u.last_name AS user_last_name
             FROM orders o
             LEFT JOIN users u ON u.id = o.user_id
             ORDER BY o.created_at DESC, o.id DESC
@@ -1687,6 +2073,69 @@ app.get('/api/products', async (req, res) => {
     } catch (err) {
         console.error('Public products error:', err.message);
         res.status(500).json({ error: 'Unable to load products.' });
+    }
+});
+
+app.get('/api/reviews', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ error: 'Reviews are temporarily unavailable.' });
+        const result = await pool.query(`
+            SELECT reviewer_name, reviewer_location, rating, review_text, created_at
+            FROM product_reviews
+            WHERE is_approved = true
+            ORDER BY created_at DESC, id DESC
+            LIMIT 100
+        `);
+        res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Public reviews error:', error.message);
+        res.status(500).json({ error: 'Unable to load reviews.' });
+    }
+});
+
+app.post('/api/newsletter/subscribe', rateLimit(5, 60 * 60 * 1000), async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+    if (!pool) return res.status(503).json({ error: 'Newsletter signup is temporarily unavailable.' });
+    try {
+        await pool.query(`
+            INSERT INTO newsletter_subscribers (email, is_active)
+            VALUES ($1, true)
+            ON CONFLICT (email) DO UPDATE SET is_active = true
+        `, [email]);
+        res.status(200).json({ ok: true, message: "You're in. Welcome to the culture." });
+    } catch (error) {
+        console.error('Newsletter subscription error:', error.message);
+        res.status(500).json({ error: 'Unable to subscribe right now. Please try again later.' });
+    }
+});
+
+app.get('/api/order-tracking/:orderNumber', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    const orderNumber = typeof req.params.orderNumber === 'string' ? req.params.orderNumber.trim().toUpperCase() : '';
+    const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+    if (!orderNumber || orderNumber.length > 50 || !validEmail(email))
+        return res.status(400).json({ error: 'Enter a valid order number and email address.' });
+    if (!pool) return res.status(503).json({ error: 'Order tracking is temporarily unavailable.' });
+    try {
+        const result = await pool.query(`
+            SELECT o.id, o.order_number, o.status, o.total, o.shipping_first_name,
+                   o.shipping_last_name, o.shipping_address, o.shipping_city, o.shipping_state,
+                   o.shipping_zip, o.shipping_country, o.tracking_number, o.shipping_carrier,
+                   o.created_at, COALESCE(o.items, '[]'::jsonb) AS items
+            FROM orders o
+            LEFT JOIN users u ON u.id = o.user_id
+            WHERE UPPER(o.order_number) = $1
+              AND LOWER(COALESCE(NULLIF(o.customer_email, ''), u.email, '')) = $2
+              AND o.status NOT IN ('abandoned', 'checkout_failed')
+            LIMIT 1
+        `, [orderNumber, email]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Order tracking error:', error.message);
+        res.status(500).json({ error: 'Unable to look up this order.' });
     }
 });
 

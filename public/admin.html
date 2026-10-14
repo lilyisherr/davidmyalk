@@ -1561,9 +1561,9 @@
                     ? '<span class="badge badge-active">APPROVED</span>'
                     : '<span class="badge badge-inactive">HIDDEN</span>';
                 return `<tr>
-                    <td><div style="font-size:13px;font-weight:600;">${r.reviewer_name}</div>${r.reviewer_location ? `<div class="font-mono text-muted" style="font-size:10px;">${r.reviewer_location}</div>` : ''}</td>
+                    <td><div style="font-size:13px;font-weight:600;">${escapeAdminText(r.reviewer_name)}</div>${r.reviewer_location ? `<div class="font-mono text-muted" style="font-size:10px;">${escapeAdminText(r.reviewer_location)}</div>` : ''}</td>
                     <td><span style="color:#f59e0b;">${stars}</span></td>
-                    <td style="max-width:260px;"><div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.review_text}</div></td>
+                    <td style="max-width:260px;"><div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeAdminText(r.review_text)}</div></td>
                     <td>${statusBadge}</td>
                     <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(r.created_at).toLocaleDateString()}</td>
                     <td>
@@ -1652,11 +1652,11 @@
                 const sc = statusColors[c.status] || '#888';
                 return `<tr style="${c.status === 'new' ? 'background:rgba(255,0,0,0.03);' : ''}">
                     <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(c.created_at).toLocaleDateString()}</td>
-                    <td style="font-size:13px;font-weight:${c.status==='new'?'700':'400'};">${c.name}</td>
-                    <td><a href="mailto:${c.email}" class="font-mono" style="font-size:11px;color:var(--primary);">${c.email}</a></td>
-                    <td style="font-size:12px;">${c.subject || '—'}</td>
-                    <td class="font-mono" style="font-size:11px;">${c.order_number || '—'}</td>
-                    <td><span class="font-mono" style="font-size:10px;color:${sc};text-transform:uppercase;">${c.status}</span></td>
+                    <td style="font-size:13px;font-weight:${c.status==='new'?'700':'400'};">${escapeAdminText(c.name)}</td>
+                    <td><a href="mailto:${escapeAdminText(encodeURIComponent(c.email))}" class="font-mono" style="font-size:11px;color:var(--primary);">${escapeAdminText(c.email)}</a></td>
+                    <td style="font-size:12px;">${escapeAdminText(c.subject || '—')}</td>
+                    <td class="font-mono" style="font-size:11px;">${escapeAdminText(c.order_number || '—')}</td>
+                    <td><span class="font-mono" style="font-size:10px;color:${sc};text-transform:uppercase;">${escapeAdminText(c.status)}</span></td>
                     <td><button onclick="viewContact(${c.id})" class="btn btn-secondary btn-sm" style="font-size:10px;">VIEW</button></td>
                 </tr>`;
             }).join('');
