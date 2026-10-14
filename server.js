@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
+const Stripe = require('stripe');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -43,8 +44,13 @@ const dbUrl = process.env.DATABASE_URL
     || process.env.POSTGRES_URL_NON_POOLING;
 if (!dbUrl) { console.error('ERROR: No database URL found. Set DATABASE_URL, POSTGRES_URL, or POSTGRES_PRISMA_URL.'); /* don't exit here so serverless can still start for static assets */ }
 const pool = dbUrl ? new Pool({ connectionString: dbUrl }) : null;
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
-app.use(express.json());
+app.use(express.json({
+    verify: (req, res, buffer) => {
+        if (req.originalUrl.startsWith('/api/stripe/webhook')) req.rawBody = Buffer.from(buffer);
+    }
+}));
 app.use(cookieParser());
 
 // Security headers for production
@@ -88,6 +94,7 @@ async function initDb() {
             image_url VARCHAR(500) DEFAULT '',
             category VARCHAR(100) DEFAULT '',
             stock INTEGER DEFAULT 0,
+            categories JSONB DEFAULT '[]',
             product_images JSONB DEFAULT '[]',
             size_inventory JSONB DEFAULT '{}',
             is_active BOOLEAN DEFAULT true,
@@ -98,6 +105,7 @@ async function initDb() {
             id SERIAL PRIMARY KEY,
             order_number VARCHAR(50) UNIQUE NOT NULL,
             user_id INTEGER REFERENCES users(id),
+            customer_email VARCHAR(255) DEFAULT '',
             status VARCHAR(50) DEFAULT 'pending',
             subtotal DECIMAL(10,2) DEFAULT 0,
             shipping_cost DECIMAL(10,2) DEFAULT 0,
@@ -110,6 +118,8 @@ async function initDb() {
             shipping_zip VARCHAR(20) DEFAULT '',
             shipping_country VARCHAR(100) DEFAULT '',
             tracking_number VARCHAR(255) DEFAULT '',
+            discount_amount DECIMAL(10,2) DEFAULT 0,
+            discount_code VARCHAR(50) DEFAULT '',
             items JSONB DEFAULT '[]',
             stripe_session_id VARCHAR(255) DEFAULT '',
             created_at TIMESTAMP DEFAULT NOW(),
@@ -200,9 +210,19 @@ async function initDb() {
     `);
     await pool.query(`
         ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS categories JSONB DEFAULT '[]';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT '';
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255) DEFAULT '';
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code VARCHAR(50) DEFAULT '';
+        UPDATE products
+        SET categories = jsonb_build_array(category)
+        WHERE category IS NOT NULL AND category <> '' AND categories = '[]'::jsonb;
+        UPDATE settings
+        SET value = 'shopdavidmyalik@gmail.com', updated_at = NOW()
+        WHERE key = 'contact_email' AND value = 'contact@davidmyalik.com';
     `);
 
     // Basic migrations left out for brevity in this serverless-friendly copy
@@ -236,6 +256,7 @@ function authMiddleware(req, res, next) {
 }
 function requireAuth(req, res, next) {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+    if (!pool) return res.status(503).json({ error: 'Account services are temporarily unavailable.' });
     next();
 }
 async function requireAdmin(req, res, next) {
@@ -263,7 +284,8 @@ function safeUser(user) {
         email: user.email,
         first_name: user.first_name || '',
         last_name: user.last_name || '',
-        role: user.role
+        role: user.role,
+        phone: user.phone || ''
     };
 }
 
@@ -273,7 +295,13 @@ function normalizeProduct(input) {
 
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const description = typeof input.description === 'string' ? input.description : '';
-    const category = typeof input.category === 'string' ? input.category.trim() : '';
+    const legacyCategory = typeof input.category === 'string' ? input.category.trim() : '';
+    const categoriesInput = input.categories === undefined ? (legacyCategory ? [legacyCategory] : []) : input.categories;
+    if (!Array.isArray(categoriesInput) || categoriesInput.length > 20
+        || categoriesInput.some(category => typeof category !== 'string' || !category.trim() || category.trim().length > 100))
+        return { error: 'Choose up to 20 valid product categories.' };
+    const categories = [...new Set(categoriesInput.map(category => category.trim()))];
+    const category = categories[0] || '';
     const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
     const price = typeof input.price === 'number'
         ? input.price
@@ -290,7 +318,7 @@ function normalizeProduct(input) {
     if (!Number.isFinite(price) || price < 0) return { error: 'Enter a valid product price.' };
     if (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 0))
         return { error: 'Enter a valid sale price.' };
-    if (description.length > 10000 || category.length > 100 || imageUrl.length > 500)
+    if (description.length > 10000 || imageUrl.length > 500)
         return { error: 'One or more product fields are too long.' };
     if (typeof input.isActive !== 'boolean') return { error: 'Product visibility must be selected.' };
     if (!Array.isArray(productImages) || productImages.length > 19
@@ -310,7 +338,7 @@ function normalizeProduct(input) {
 
     return {
         values: [
-            name, description, price, salePrice, imageUrl, category, rawStock,
+            name, description, price, salePrice, imageUrl, category, rawStock, JSON.stringify(categories),
             JSON.stringify(productImages), JSON.stringify(sizeInventory || {}),
             input.isActive
         ]
@@ -343,7 +371,8 @@ const rateLimitBuckets = new Map();
 function rateLimit(limit, windowMs) {
     return (req, res, next) => {
         const now = Date.now();
-        const key = `${req.method}:${req.path}:${req.ip || req.socket.remoteAddress}`;
+        const routePath = req.route && req.route.path ? req.route.path : req.path;
+        const key = `${req.method}:${req.baseUrl || ''}${routePath}:${req.ip || req.socket.remoteAddress}`;
         let bucket = rateLimitBuckets.get(key);
         if (!bucket || now - bucket.startedAt >= windowMs) {
             bucket = { startedAt: now, count: 0 };
@@ -424,6 +453,70 @@ app.post('/api/auth/signup', rateLimit(8, 60 * 60 * 1000), async (req, res) => {
     }
 });
 
+const PASSWORD_RESET_MESSAGE = 'If an account with that email exists, a password reset link will be sent shortly.';
+app.post('/api/auth/forgot-password', rateLimit(5, 60 * 60 * 1000), async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!validEmail(email)) return res.status(200).json({ message: PASSWORD_RESET_MESSAGE });
+    if (!pool) return res.status(503).json({ error: 'Password reset is temporarily unavailable.' });
+    try {
+        const result = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (result.rows.length) {
+            const userId = result.rows[0].id;
+            const token = crypto.randomBytes(32).toString('hex');
+            const storedToken = crypto.createHash('sha256').update(token).digest('hex');
+            await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+            await pool.query(
+                'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'1 hour\')',
+                [userId, storedToken]
+            );
+            const baseUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+            const link = `${baseUrl}/forgot-password?token=${encodeURIComponent(token)}`;
+            const sent = await sendEmail({
+                to: email,
+                subject: 'Reset your DAVID MYALIK password',
+                text: `We received a request to reset your password. Open this link within one hour to choose a new password:\n\n${link}\n\nIf you did not request this, you can ignore this email.`
+            });
+            if (!sent) console.error('Password reset email could not be delivered.');
+        }
+        res.json({ message: PASSWORD_RESET_MESSAGE });
+    } catch (error) {
+        console.error('Password reset request error:', error.message);
+        res.json({ message: PASSWORD_RESET_MESSAGE });
+    }
+});
+
+app.post('/api/auth/reset-password', rateLimit(10, 60 * 60 * 1000), async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!/^[a-f0-9]{64}$/i.test(token) || password.length < 12 || password.length > 128)
+        return res.status(400).json({ error: 'Use a valid reset link and a password of at least 12 characters.' });
+    let client;
+    try {
+        const storedToken = crypto.createHash('sha256').update(token).digest('hex');
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const result = await client.query(
+            'SELECT id, user_id FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() FOR UPDATE',
+            [storedToken]
+        );
+        if (!result.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'This reset link is invalid or expired. Request a new one.' });
+        }
+        const passwordHash = await bcrypt.hash(password, 12);
+        await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, result.rows[0].user_id]);
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [result.rows[0].user_id]);
+        await client.query('COMMIT');
+        res.json({ ok: true });
+    } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
+        console.error('Password reset error:', error.message);
+        res.status(500).json({ error: 'Unable to reset your password right now.' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
 app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? safeUser(req.user) : null }));
 app.post('/api/auth/logout', (req, res) => {
     res.clearCookie('auth_token', {
@@ -435,8 +528,239 @@ app.post('/api/auth/logout', (req, res) => {
     res.json({ ok: true });
 });
 
+app.get('/api/orders', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, order_number, status, total, tracking_number, shipping_carrier,
+                   COALESCE(items, '[]'::jsonb) AS items, created_at
+            FROM orders
+            WHERE user_id = $1 AND status NOT IN ('abandoned', 'checkout_failed')
+            ORDER BY created_at DESC, id DESC
+        `, [req.user.id]);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Customer order list error:', error.message);
+        res.status(500).json({ error: 'Unable to load your orders.' });
+    }
+});
+
+app.get('/api/orders/:id', requireAuth, async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID.' });
+    try {
+        const result = await pool.query(`
+            SELECT id, order_number, status, subtotal, shipping_cost, total,
+                   shipping_first_name, shipping_last_name, shipping_address,
+                   shipping_city, shipping_state, shipping_zip, shipping_country,
+                   tracking_number, shipping_carrier, COALESCE(items, '[]'::jsonb) AS items,
+                   created_at, updated_at
+            FROM orders
+            WHERE id = $1 AND user_id = $2
+        `, [id, req.user.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Customer order detail error:', error.message);
+        res.status(500).json({ error: 'Unable to load this order.' });
+    }
+});
+
+app.get('/api/user/stats', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT u.created_at AS member_since,
+                   COUNT(o.id) FILTER (WHERE o.status NOT IN ('abandoned', 'checkout_failed'))::integer AS total_orders,
+                   COALESCE(SUM(o.total) FILTER (
+                       WHERE o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+                   ), 0)::numeric AS total_spent
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.id AND o.status NOT IN ('abandoned', 'checkout_failed')
+            WHERE u.id = $1
+            GROUP BY u.id, u.created_at
+        `, [req.user.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Account not found.' });
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json({
+            totalOrders: result.rows[0].total_orders,
+            totalSpent: Number(result.rows[0].total_spent),
+            memberSince: result.rows[0].member_since
+        });
+    } catch (error) {
+        console.error('Customer statistics error:', error.message);
+        res.status(500).json({ error: 'Unable to load your account statistics.' });
+    }
+});
+
+app.get('/api/user/addresses', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, first_name, last_name, address_line1, address_line2,
+                   city, state, zip, country, is_default
+            FROM user_addresses
+            WHERE user_id = $1
+            ORDER BY is_default DESC, id DESC
+        `, [req.user.id]);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Customer address list error:', error.message);
+        res.status(500).json({ error: 'Unable to load your saved addresses.' });
+    }
+});
+
+function normalizeAddress(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'Enter a valid address.' };
+    const fields = {
+        first_name: input.firstName,
+        last_name: input.lastName,
+        address_line1: input.addressLine1,
+        address_line2: input.addressLine2 || '',
+        city: input.city,
+        state: input.state || '',
+        zip: input.zip,
+        country: input.country || 'US'
+    };
+    const limits = {
+        first_name: 100, last_name: 100, address_line1: 255, address_line2: 255,
+        city: 100, state: 100, zip: 20, country: 100
+    };
+    for (const [key, value] of Object.entries(fields)) {
+        if (typeof value !== 'string' || value.trim().length > limits[key]
+            || (['first_name', 'last_name', 'address_line1', 'city', 'zip'].includes(key) && !value.trim()))
+            return { error: 'Complete the required address fields and keep each value within its limit.' };
+        fields[key] = value.trim();
+    }
+    return { fields };
+}
+
+app.post('/api/user/addresses', requireAuth, async (req, res) => {
+    const address = normalizeAddress(req.body);
+    if (address.error) return res.status(400).json({ error: address.error });
+    const isDefault = req.body.isDefault === true;
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+        if (isDefault) await client.query('UPDATE user_addresses SET is_default = false WHERE user_id = $1', [req.user.id]);
+        const fields = address.fields;
+        const result = await client.query(`
+            INSERT INTO user_addresses
+                (user_id, first_name, last_name, address_line1, address_line2, city, state, zip, country, is_default)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, first_name, last_name, address_line1, address_line2, city, state, zip, country, is_default
+        `, [
+            req.user.id, fields.first_name, fields.last_name, fields.address_line1, fields.address_line2,
+            fields.city, fields.state, fields.zip, fields.country, isDefault
+        ]);
+        await client.query('COMMIT');
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        if (client) await client.query('ROLLBACK');
+        console.error('Customer address creation error:', error.message);
+        res.status(500).json({ error: 'Unable to save this address.' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
+app.delete('/api/user/addresses/:id', requireAuth, async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid address ID.' });
+    try {
+        const result = await pool.query(
+            'DELETE FROM user_addresses WHERE id = $1 AND user_id = $2 RETURNING id',
+            [id, req.user.id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Address not found.' });
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Customer address deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to remove this address.' });
+    }
+});
+
+app.patch('/api/user/addresses/:id/default', requireAuth, async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid address ID.' });
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const owned = await client.query(
+            'SELECT id FROM user_addresses WHERE id = $1 AND user_id = $2 FOR UPDATE',
+            [id, req.user.id]
+        );
+        if (!owned.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Address not found.' });
+        }
+        await client.query('UPDATE user_addresses SET is_default = false WHERE user_id = $1', [req.user.id]);
+        const result = await client.query(
+            'UPDATE user_addresses SET is_default = true WHERE id = $1 AND user_id = $2 RETURNING id, is_default',
+            [id, req.user.id]
+        );
+        await client.query('COMMIT');
+        res.json(result.rows[0]);
+    } catch (error) {
+        if (client) await client.query('ROLLBACK');
+        console.error('Customer default address error:', error.message);
+        res.status(500).json({ error: 'Unable to update your default address.' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
+app.put('/api/user/profile', requireAuth, async (req, res) => {
+    const body = req.body || {};
+    const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+    const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
+    const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+    if (!firstName || firstName.length > 100 || !lastName || lastName.length > 100 || phone.length > 50)
+        return res.status(400).json({ error: 'Enter a valid first name, last name, and phone number.' });
+    try {
+        const result = await pool.query(`
+            UPDATE users SET first_name = $1, last_name = $2, phone = $3
+            WHERE id = $4
+            RETURNING id, email, first_name, last_name, phone, role
+        `, [firstName, lastName, phone, req.user.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Account not found.' });
+        setAuthCookie(req, res, result.rows[0]);
+        res.json({ user: safeUser(result.rows[0]) });
+    } catch (error) {
+        console.error('Customer profile update error:', error.message);
+        res.status(500).json({ error: 'Unable to update your profile.' });
+    }
+});
+
+app.put('/api/user/password', requireAuth, rateLimit(5, 15 * 60 * 1000), async (req, res) => {
+    const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+    if (newPassword.length < 12 || newPassword.length > 128)
+        return res.status(400).json({ error: 'Your new password must be between 12 and 128 characters.' });
+    try {
+        const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Account not found.' });
+        if (!await bcrypt.compare(currentPassword, result.rows[0].password_hash))
+            return res.status(400).json({ error: 'Your current password is incorrect.' });
+        const hash = await bcrypt.hash(newPassword, 12);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Customer password update error:', error.message);
+        res.status(500).json({ error: 'Unable to update your password.' });
+    }
+});
+
 app.get('/api/settings/all', async (req, res) => {
-    try { res.json(await readSettings(PUBLIC_SETTING_KEYS)); }
+    try {
+        const settings = await readSettings(PUBLIC_SETTING_KEYS);
+        settings.contact_email = validEmail(settings.contact_email)
+            ? settings.contact_email
+            : 'shopdavidmyalik@gmail.com';
+        res.json(settings);
+    }
     catch (error) {
         console.error('Public settings error:', error.message);
         res.status(500).json({ error: 'Unable to load store settings.' });
@@ -454,6 +778,343 @@ app.get('/api/settings/shipping', async (req, res) => {
         console.error('Shipping settings error:', error.message);
         res.status(500).json({ error: 'Unable to load shipping settings.' });
     }
+});
+
+async function getValidDiscount(code, subtotal) {
+    if (!code) return { code: '', amount: 0 };
+    const result = await pool.query(`
+        SELECT code, type, value, min_order_amount, usage_limit, usage_count, expires_at
+        FROM discount_codes
+        WHERE UPPER(code) = UPPER($1) AND is_active = true
+        LIMIT 1
+    `, [code]);
+    const discount = result.rows[0];
+    if (!discount) throw new Error('This discount code is invalid or inactive.');
+    if (discount.expires_at && new Date(discount.expires_at).getTime() <= Date.now())
+        throw new Error('This discount code has expired.');
+    if (discount.usage_limit !== null && Number(discount.usage_count) >= Number(discount.usage_limit))
+        throw new Error('This discount code has reached its usage limit.');
+    if (subtotal < Number(discount.min_order_amount || 0))
+        throw new Error(`This code requires a minimum order of $${Number(discount.min_order_amount).toFixed(2)}.`);
+    const value = Number(discount.value);
+    if (!Number.isFinite(value) || value <= 0 || !['percentage', 'fixed'].includes(discount.type))
+        throw new Error('This discount code is invalid.');
+    const amount = discount.type === 'percentage'
+        ? subtotal * Math.min(value, 100) / 100
+        : Math.min(subtotal, value);
+    return { code: discount.code, amount: Math.round(amount * 100) / 100 };
+}
+
+function normalizeCheckoutCart(input) {
+    if (!Array.isArray(input) || input.length < 1 || input.length > 50)
+        return { error: 'Your cart is empty or contains too many items.' };
+    const entries = new Map();
+    for (const item of input) {
+        const id = Number(item && item.id);
+        const quantity = Number(item && item.qty);
+        const size = item && typeof item.size === 'string' ? item.size.trim() : '';
+        if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100)
+            return { error: 'Your cart contains an invalid product or quantity.' };
+        if (size.length > 20) return { error: 'A selected size is invalid.' };
+        const key = `${id}:${size}`;
+        const previous = entries.get(key) || { id, quantity: 0, size };
+        previous.quantity += quantity;
+        if (previous.quantity > 100) return { error: 'A product quantity cannot exceed 100.' };
+        entries.set(key, previous);
+    }
+    return { entries: [...entries.values()] };
+}
+
+function normalizeShipping(input) {
+    const result = normalizeAddress({
+        firstName: input && input.firstName,
+        lastName: input && input.lastName,
+        addressLine1: input && input.address,
+        city: input && input.city,
+        state: input && input.state,
+        zip: input && input.zip,
+        country: input && input.country
+    });
+    return result;
+}
+
+app.post('/api/discounts/validate', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim().slice(0, 50) : '';
+    const subtotal = Number(req.body?.subtotal);
+    if (!code || !Number.isFinite(subtotal) || subtotal < 0 || subtotal > 100000)
+        return res.status(400).json({ error: 'Enter a valid discount code and order subtotal.' });
+    try {
+        const result = await getValidDiscount(code, subtotal);
+        const row = await pool.query(
+            'SELECT type, value FROM discount_codes WHERE UPPER(code) = UPPER($1) LIMIT 1',
+            [result.code]
+        );
+        res.json({
+            code: result.code,
+            type: row.rows[0].type,
+            value: Number(row.rows[0].value),
+            discountAmount: result.amount
+        });
+    } catch (error) {
+        if (error.message.startsWith('This discount') || error.message.startsWith('This code'))
+            return res.status(400).json({ error: error.message });
+        console.error('Discount validation error:', error.message);
+        res.status(500).json({ error: 'Unable to validate this discount code.' });
+    }
+});
+
+app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: 'Online checkout is not configured yet. Please try again later.' });
+    const cart = normalizeCheckoutCart(req.body && req.body.cart);
+    const shipping = normalizeShipping(req.body && req.body.shipping);
+    if (cart.error) return res.status(400).json({ error: cart.error });
+    if (shipping.error) return res.status(400).json({ error: shipping.error });
+    try {
+        const settings = await readSettings([
+            'shipping_cost', 'free_shipping_threshold', 'min_order_amount',
+            'guest_checkout_enabled', 'allow_backorders'
+        ]);
+        if (!req.user && settings.guest_checkout_enabled === 'false')
+            return res.status(401).json({ error: 'Please sign in before placing an order.' });
+
+        const productIds = [...new Set(cart.entries.map(item => item.id))];
+        const productsResult = await pool.query(
+            'SELECT id, name, description, price, sale_price, image_url, stock, size_inventory, is_active FROM products WHERE id = ANY($1::int[])',
+            [productIds]
+        );
+        const products = new Map(productsResult.rows.map(product => [product.id, product]));
+        const quantityByProduct = new Map();
+        for (const item of cart.entries)
+            quantityByProduct.set(item.id, (quantityByProduct.get(item.id) || 0) + item.quantity);
+        const orderItems = [];
+        let subtotalCents = 0;
+        for (const item of cart.entries) {
+            const product = products.get(item.id);
+            if (!product || !product.is_active)
+                return res.status(400).json({ error: 'One or more items in your cart are no longer available.' });
+            if (settings.allow_backorders !== 'true'
+                && Number(product.stock) < quantityByProduct.get(item.id))
+                return res.status(409).json({ error: `${product.name} does not have enough stock available.` });
+            const inventory = typeof product.size_inventory === 'string'
+                ? JSON.parse(product.size_inventory || '{}')
+                : product.size_inventory || {};
+            if (Object.keys(inventory).length && !item.size)
+                return res.status(400).json({ error: `Select a size for ${product.name}.` });
+            if (item.size && !Object.prototype.hasOwnProperty.call(inventory, item.size))
+                return res.status(400).json({ error: `The selected size for ${product.name} is unavailable.` });
+            if (item.size && settings.allow_backorders !== 'true' && Number(inventory[item.size]) < item.quantity)
+                return res.status(409).json({ error: `There is not enough stock in size ${item.size} for ${product.name}.` });
+            const regularPrice = Number(product.price);
+            const salePrice = product.sale_price === null ? null : Number(product.sale_price);
+            const price = salePrice !== null && salePrice < regularPrice ? salePrice : regularPrice;
+            if (!Number.isFinite(price) || price < 0)
+                return res.status(400).json({ error: 'A product in your cart has an invalid price.' });
+            const priceCents = Math.round(price * 100);
+            subtotalCents += priceCents * item.quantity;
+            orderItems.push({
+                id: product.id,
+                product_name: product.name,
+                product_image: product.image_url || '',
+                quantity: item.quantity,
+                size: item.size,
+                price_at_purchase: (priceCents / 100).toFixed(2)
+            });
+        }
+        const subtotal = subtotalCents / 100;
+        const minimum = Number(settings.min_order_amount) || 0;
+        if (subtotal < minimum) return res.status(400).json({ error: `The minimum order amount is $${minimum.toFixed(2)}.` });
+        const freeShippingThreshold = Number(settings.free_shipping_threshold) || 0;
+        const shippingCost = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold
+            ? 0
+            : Math.max(0, Number(settings.shipping_cost) || 0);
+        const discountCode = typeof req.body.discountCode === 'string' ? req.body.discountCode.trim().slice(0, 50) : '';
+        const discount = await getValidDiscount(discountCode, subtotal);
+        const total = Math.max(0, Math.round((subtotal + shippingCost - discount.amount) * 100) / 100);
+        if (total <= 0) return res.status(400).json({ error: 'Order total must be greater than zero.' });
+        const prefix = (settings.order_prefix || 'DM').replace(/[^A-Za-z0-9-]/g, '').slice(0, 10) || 'DM';
+        const orderNumber = `${prefix}-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const baseUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+
+        const orderResult = await pool.query(`
+            INSERT INTO orders
+                (order_number, user_id, status, subtotal, shipping_cost, total, customer_email,
+                 shipping_first_name, shipping_last_name, shipping_address, shipping_city,
+                 shipping_state, shipping_zip, shipping_country, discount_amount, discount_code, items)
+            VALUES ($1, $2, 'pending_payment', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
+            RETURNING id
+        `, [
+            orderNumber, req.user ? req.user.id : null, subtotal, shippingCost, total,
+            req.user ? req.user.email : '',
+            shipping.fields.first_name, shipping.fields.last_name, shipping.fields.address_line1,
+            shipping.fields.city, shipping.fields.state, shipping.fields.zip, shipping.fields.country,
+            discount.amount, discount.code, JSON.stringify(orderItems)
+        ]);
+        const orderId = orderResult.rows[0].id;
+        try {
+            const description = orderItems.map(item =>
+                `${item.product_name}${item.size ? ` (${item.size})` : ''} × ${item.quantity}`
+            ).join(', ').slice(0, 500);
+            const session = await stripe.checkout.sessions.create({
+                mode: 'payment',
+                line_items: [{
+                    quantity: 1,
+                    price_data: {
+                        currency: 'usd',
+                        unit_amount: Math.round(total * 100),
+                        product_data: { name: `DAVID MYALIK Order ${orderNumber}`, description }
+                    }
+                }],
+                metadata: { order_id: String(orderId) },
+                success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}#shop`,
+                cancel_url: `${baseUrl}/?checkout=cancelled#shop`
+            });
+            await pool.query('UPDATE orders SET stripe_session_id = $1 WHERE id = $2', [session.id, orderId]);
+            res.json({ url: session.url });
+        } catch (error) {
+            await pool.query("UPDATE orders SET status = 'checkout_failed', updated_at = NOW() WHERE id = $1", [orderId]);
+            throw error;
+        }
+    } catch (error) {
+        if (error.message.startsWith('This discount') || error.message.startsWith('This code'))
+            return res.status(400).json({ error: error.message });
+        console.error('Checkout creation error:', error.message);
+        res.status(500).json({ error: 'Unable to start checkout. Please try again.' });
+    }
+});
+
+app.post('/api/checkout/direct', (req, res) => {
+    res.status(503).json({ error: 'Direct unpaid checkout is disabled. Configure Stripe to accept orders securely.' });
+});
+
+async function finalizePaidOrder(session, userId = null, fromWebhook = false) {
+    if (session.payment_status !== 'paid' || !session.metadata?.order_id)
+        throw Object.assign(new Error('Payment has not completed.'), { status: 409 });
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const orderResult = await client.query(
+            'SELECT id, user_id, order_number, status, subtotal, shipping_cost, discount_amount, total, items, discount_code FROM orders WHERE id = $1 AND stripe_session_id = $2 FOR UPDATE',
+            [session.metadata.order_id, session.id]
+        );
+        if (!orderResult.rows.length) throw Object.assign(new Error('Order not found.'), { status: 404 });
+        const order = orderResult.rows[0];
+        if (order.user_id && !fromWebhook && (userId === null || Number(order.user_id) !== Number(userId)))
+            throw Object.assign(new Error('Order not found.'), { status: 404 });
+        if (Number(session.amount_total) !== Math.round(Number(order.total) * 100)
+            || session.currency !== 'usd')
+            throw Object.assign(new Error('Payment details do not match this order.'), { status: 409 });
+        if (order.status === 'pending_payment') {
+            const paidEmail = typeof session.customer_details?.email === 'string'
+                ? session.customer_details.email.trim().toLowerCase()
+                : '';
+            if (paidEmail) {
+                await client.query(
+                    'UPDATE orders SET customer_email = $1 WHERE id = $2 AND customer_email = $3',
+                    [paidEmail, order.id, '']
+                );
+            }
+            const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+            let inventoryIssue = false;
+            for (const item of items) {
+                const product = await client.query(
+                    'SELECT stock, size_inventory FROM products WHERE id = $1 FOR UPDATE',
+                    [item.id]
+                );
+                if (!product.rows.length || Number(product.rows[0].stock) < Number(item.quantity)) {
+                    inventoryIssue = true;
+                    continue;
+                }
+                const inventory = typeof product.rows[0].size_inventory === 'string'
+                    ? JSON.parse(product.rows[0].size_inventory || '{}')
+                    : product.rows[0].size_inventory || {};
+                if (item.size && Number(inventory[item.size]) < Number(item.quantity)) {
+                    inventoryIssue = true;
+                    continue;
+                }
+                if (item.size) inventory[item.size] = Number(inventory[item.size]) - Number(item.quantity);
+                const totalStock = item.size
+                    ? Object.values(inventory).reduce((sum, quantity) => sum + Number(quantity || 0), 0)
+                    : Number(product.rows[0].stock) - Number(item.quantity);
+                await client.query(
+                    'UPDATE products SET stock = $1, size_inventory = $2::jsonb WHERE id = $3',
+                    [totalStock, JSON.stringify(inventory), item.id]
+                );
+            }
+            const status = inventoryIssue ? 'paid_stock_issue' : 'processing';
+            await client.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [status, order.id]);
+            if (order.discount_code) {
+                await client.query(
+                    'UPDATE discount_codes SET usage_count = usage_count + 1 WHERE UPPER(code) = UPPER($1)',
+                    [order.discount_code]
+                );
+            }
+            if (order.user_id) {
+                await client.query(`
+                    INSERT INTO user_addresses
+                        (user_id, first_name, last_name, address_line1, city, state, zip, country, is_default)
+                    SELECT $1, shipping_first_name, shipping_last_name, shipping_address, shipping_city,
+                           shipping_state, shipping_zip, shipping_country,
+                           NOT EXISTS (SELECT 1 FROM user_addresses WHERE user_id = $1)
+                    FROM orders WHERE id = $2
+                      AND NOT EXISTS (
+                          SELECT 1 FROM user_addresses
+                          WHERE user_id = $1 AND address_line1 = shipping_address
+                            AND city = shipping_city AND zip = shipping_zip
+                      )
+                `, [order.user_id, order.id]);
+            }
+        }
+        await client.query('COMMIT');
+        return { id: order.id, order_number: order.order_number };
+    } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        if (client) client.release();
+    }
+}
+
+app.post('/api/checkout/complete', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: 'Payment verification is not configured.' });
+    const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId : '';
+    if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId))
+        return res.status(400).json({ error: 'Invalid checkout session.' });
+    try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const order = await finalizePaidOrder(session, req.user ? req.user.id : null);
+        res.json({ order });
+    } catch (error) {
+        console.error('Checkout payment confirmation error:', error.message);
+        res.status(error.status || 500).json({
+            error: error.status ? error.message : 'Unable to confirm your payment. Contact support if your payment was completed.'
+        });
+    }
+});
+
+app.post('/api/stripe/webhook', rateLimit(100, 60 * 1000), async (req, res) => {
+    if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET)
+        return res.status(503).json({ error: 'Payment webhook is not configured.' });
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(
+            req.rawBody,
+            req.headers['stripe-signature'],
+            process.env.STRIPE_WEBHOOK_SECRET
+        );
+    } catch {
+        return res.status(400).json({ error: 'Invalid payment webhook signature.' });
+    }
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+        try {
+            const session = await stripe.checkout.sessions.retrieve(event.data.object.id);
+            if (session.payment_status === 'paid') await finalizePaidOrder(session, null, true);
+        } catch (error) {
+            console.error('Stripe webhook order processing error:', error.message);
+            return res.status(500).json({ error: 'Unable to process paid order.' });
+        }
+    }
+    res.json({ received: true });
 });
 
 app.get('/api/settings/grind', async (req, res) => {
@@ -507,12 +1168,328 @@ app.get('/api/admin/settings', async (req, res) => {
     }
 });
 
+app.get('/api/admin/stripe-status', (req, res) => {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    res.json({
+        configured: Boolean(stripe),
+        mode: key.startsWith('sk_live_') ? 'live' : key.startsWith('sk_test_') ? 'test' : null,
+        webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET)
+    });
+});
+
+app.put('/api/admin/settings/socials', async (req, res) => {
+    const allowedIcons = new Set(['youtube', 'instagram', 'twitter', 'discord', 'tiktok', 'facebook']);
+    const socials = req.body && req.body.socials;
+    if (!Array.isArray(socials) || socials.length > 20)
+        return res.status(400).json({ error: 'Provide a list of up to 20 social links.' });
+    const normalized = [];
+    for (const item of socials) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+            || typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 40
+            || typeof item.icon !== 'string' || !allowedIcons.has(item.icon)
+            || typeof item.url !== 'string' || item.url.length > 500
+            || (item.enabled !== true && item.enabled !== false)) {
+            return res.status(400).json({ error: 'One or more social links are invalid.' });
+        }
+        let url = '';
+        if (item.url.trim()) {
+            try {
+                const parsed = new URL(item.url.trim());
+                if (parsed.protocol !== 'https:') throw new Error('Use secure HTTPS links.');
+                url = parsed.href;
+            } catch {
+                return res.status(400).json({ error: 'Social links must be valid HTTPS URLs.' });
+            }
+        }
+        normalized.push({ name: item.name.trim(), icon: item.icon, url, enabled: item.enabled });
+    }
+    try {
+        await pool.query(
+            `INSERT INTO settings (key, value, updated_at) VALUES ('socials', $1, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+            [JSON.stringify(normalized)]
+        );
+        await adminLog(req, 'update_socials', `Updated ${normalized.length} social link(s)`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Save social links error:', error.message);
+        res.status(500).json({ error: 'Unable to save social links.' });
+    }
+});
+
+app.put('/api/admin/settings/grind', async (req, res) => {
+    const body = req.body || {};
+    const fields = {
+        grind_title: [body.title, 100],
+        grind_text: [body.text, 10000],
+        grind_quote: [body.quote, 1000],
+        grind_image: [body.image, 500],
+        grind_link_url: [body.linkUrl, 500],
+        grind_link_text: [body.linkText, 80]
+    };
+    for (const [value, max] of Object.values(fields)) {
+        if (typeof value !== 'string' || value.length > max)
+            return res.status(400).json({ error: 'One or more story section fields are invalid or too long.' });
+    }
+    const image = body.image.trim();
+    const link = body.linkUrl.trim();
+    const safeLocalOrHttps = value => !value
+        || (/^\/(?!\/)[^\s\\]*$/.test(value))
+        || /^https:\/\/[^\s]+$/i.test(value);
+    if (!safeLocalOrHttps(image) || !safeLocalOrHttps(link))
+        return res.status(400).json({ error: 'Story links and images must use HTTPS or a local site path.' });
+    try {
+        for (const [key, [value]] of Object.entries(fields)) {
+            await pool.query(
+                'INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()',
+                [key, value.trim()]
+            );
+        }
+        await adminLog(req, 'update_story_section', 'Updated the storefront story section');
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Save story section error:', error.message);
+        res.status(500).json({ error: 'Unable to save the story section.' });
+    }
+});
+
+app.get('/api/admin/reviews', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at FROM product_reviews ORDER BY created_at DESC, id DESC');
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin reviews error:', error.message);
+        res.status(500).json({ error: 'Unable to load reviews.' });
+    }
+});
+
+function normalizeReview(input) {
+    const body = input || {};
+    const name = typeof body.reviewer_name === 'string' ? body.reviewer_name.trim() : '';
+    const location = typeof body.reviewer_location === 'string' ? body.reviewer_location.trim() : '';
+    const text = typeof body.review_text === 'string' ? body.review_text.trim() : '';
+    const rating = Number(body.rating);
+    if (!name || name.length > 255 || location.length > 255 || !text || text.length > 5000
+        || !Number.isInteger(rating) || rating < 1 || rating > 5
+        || typeof body.is_approved !== 'boolean') return null;
+    return [name, location, rating, text, body.is_approved];
+}
+
+app.post('/api/admin/reviews', async (req, res) => {
+    const review = normalizeReview(req.body);
+    if (!review) return res.status(400).json({ error: 'Enter a valid name, review, and 1–5 star rating.' });
+    try {
+        const result = await pool.query(`
+            INSERT INTO product_reviews (reviewer_name, reviewer_location, rating, review_text, is_approved)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at
+        `, review);
+        await adminLog(req, 'review_created', `Created review ID ${result.rows[0].id}`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin review creation error:', error.message);
+        res.status(500).json({ error: 'Unable to save this review.' });
+    }
+});
+
+app.put('/api/admin/reviews/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const review = normalizeReview(req.body);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid review ID.' });
+    if (!review) return res.status(400).json({ error: 'Enter a valid name, review, and 1–5 star rating.' });
+    try {
+        const result = await pool.query(`
+            UPDATE product_reviews
+            SET reviewer_name = $1, reviewer_location = $2, rating = $3, review_text = $4, is_approved = $5
+            WHERE id = $6
+            RETURNING id, reviewer_name, reviewer_location, rating, review_text, is_approved, created_at
+        `, [...review, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Review not found.' });
+        await adminLog(req, 'review_updated', `Updated review ID ${id}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin review update error:', error.message);
+        res.status(500).json({ error: 'Unable to update this review.' });
+    }
+});
+
+app.delete('/api/admin/reviews/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid review ID.' });
+    try {
+        const result = await pool.query('DELETE FROM product_reviews WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Review not found.' });
+        await adminLog(req, 'review_deleted', `Deleted review ID ${id}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin review deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete this review.' });
+    }
+});
+
+app.get('/api/admin/contact-submissions', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, name, email, subject, message, order_number, status, created_at FROM contact_submissions ORDER BY created_at DESC, id DESC LIMIT 500');
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin contact list error:', error.message);
+        res.status(500).json({ error: 'Unable to load contact submissions.' });
+    }
+});
+
+app.put('/api/admin/contact-submissions/:id/status', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const status = req.body && req.body.status;
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid submission ID.' });
+    if (!['new', 'read', 'replied'].includes(status)) return res.status(400).json({ error: 'Invalid contact status.' });
+    try {
+        const result = await pool.query(
+            'UPDATE contact_submissions SET status = $1 WHERE id = $2 RETURNING id, status',
+            [status, id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Contact submission not found.' });
+        await adminLog(req, 'contact_status_updated', `Updated contact submission ${id} to ${status}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin contact status error:', error.message);
+        res.status(500).json({ error: 'Unable to update contact status.' });
+    }
+});
+
+app.get('/api/admin/discounts', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, code, type, value, min_order_amount, usage_limit, usage_count, is_active, expires_at, created_at FROM discount_codes ORDER BY created_at DESC, id DESC'
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin discounts error:', error.message);
+        res.status(500).json({ error: 'Unable to load discount codes.' });
+    }
+});
+
+app.post('/api/admin/discounts', async (req, res) => {
+    const body = req.body || {};
+    const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+    const type = body.type;
+    const value = Number(body.value);
+    const minOrderAmount = body.minOrderAmount === undefined ? 0 : Number(body.minOrderAmount);
+    const usageLimit = body.usageLimit === null || body.usageLimit === undefined || body.usageLimit === ''
+        ? null : Number(body.usageLimit);
+    const expiresAt = body.expiresAt || null;
+    if (!/^[A-Z0-9_-]{3,50}$/.test(code) || !['percentage', 'fixed'].includes(type)
+        || !Number.isFinite(value) || value <= 0 || value > (type === 'percentage' ? 100 : 100000)
+        || !Number.isFinite(minOrderAmount) || minOrderAmount < 0 || minOrderAmount > 100000
+        || (usageLimit !== null && (!Number.isInteger(usageLimit) || usageLimit < 1 || usageLimit > 10000000))
+        || (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()))
+        || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) {
+        return res.status(400).json({ error: 'Check the discount code, type, value, minimum order, usage limit, and expiration date.' });
+    }
+    try {
+        const result = await pool.query(`
+            INSERT INTO discount_codes (code, type, value, min_order_amount, usage_limit, is_active, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, code, type, value, min_order_amount, usage_limit, usage_count, is_active, expires_at, created_at
+        `, [code, type, value, minOrderAmount, usageLimit, body.isActive !== false, expiresAt]);
+        await adminLog(req, 'discount_created', `Created discount code ${code}`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        if (error.code === '23505') return res.status(409).json({ error: 'That discount code already exists.' });
+        console.error('Admin discount creation error:', error.message);
+        res.status(500).json({ error: 'Unable to create the discount code.' });
+    }
+});
+
+app.patch('/api/admin/discounts/:id/toggle', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid discount ID.' });
+    try {
+        const result = await pool.query(
+            'UPDATE discount_codes SET is_active = NOT is_active WHERE id = $1 RETURNING id, code, is_active',
+            [id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Discount code not found.' });
+        await adminLog(req, 'discount_toggled', `Changed discount code ${result.rows[0].code} active status`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin discount toggle error:', error.message);
+        res.status(500).json({ error: 'Unable to change the discount status.' });
+    }
+});
+
+app.delete('/api/admin/discounts/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid discount ID.' });
+    try {
+        const result = await pool.query('DELETE FROM discount_codes WHERE id = $1 RETURNING code', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Discount code not found.' });
+        await adminLog(req, 'discount_deleted', `Deleted discount code ${result.rows[0].code}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin discount deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete the discount code.' });
+    }
+});
+
+app.put('/api/admin/orders/:id/status', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const body = req.body || {};
+    const allowedStatuses = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+    const allowedCarriers = new Set(['', 'usps', 'ups', 'fedex', 'dhl', 'other']);
+    const status = typeof body.status === 'string' ? body.status : '';
+    const trackingNumber = typeof body.trackingNumber === 'string' ? body.trackingNumber.trim() : '';
+    const shippingCarrier = typeof body.shippingCarrier === 'string' ? body.shippingCarrier : '';
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID.' });
+    if (!allowedStatuses.has(status) || !allowedCarriers.has(shippingCarrier)
+        || trackingNumber.length > 200 || (trackingNumber && !shippingCarrier)) {
+        return res.status(400).json({ error: 'Check the order status, carrier, and tracking number.' });
+    }
+    try {
+        const result = await pool.query(`
+            UPDATE orders
+            SET status = $1, tracking_number = $2, shipping_carrier = $3, updated_at = NOW()
+            WHERE id = $4
+            RETURNING id, order_number, status, tracking_number, shipping_carrier
+        `, [status, trackingNumber, shippingCarrier, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        await adminLog(req, 'update_order', `Updated order ${result.rows[0].order_number} to ${status}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin order update error:', error.message);
+        res.status(500).json({ error: 'Unable to update this order.' });
+    }
+});
+
+app.delete('/api/admin/orders/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID.' });
+    try {
+        const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING order_number', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        await adminLog(req, 'delete_order', `Deleted order ${result.rows[0].order_number}`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin order deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to delete this order.' });
+    }
+});
+
 app.get('/api/admin/categories', async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category <> '' ORDER BY category"
+            'SELECT category, categories FROM products'
         );
-        res.json(result.rows.map(row => row.category));
+        const categories = new Set();
+        for (const row of result.rows) {
+            if (row.category) categories.add(row.category);
+            const values = Array.isArray(row.categories) ? row.categories : [];
+            values.forEach(category => {
+                if (typeof category === 'string' && category.trim()) categories.add(category.trim());
+            });
+        }
+        res.json([...categories].sort((a, b) => a.localeCompare(b)));
     } catch (error) {
         console.error('Admin categories error:', error.message);
         res.status(500).json({ error: 'Unable to load product categories.' });
@@ -548,8 +1525,8 @@ app.post('/api/admin/products', async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO products
-                (name, description, price, sale_price, image_url, category, stock, product_images, size_inventory, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10)
+                (name, description, price, sale_price, image_url, category, stock, categories, product_images, size_inventory, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11)
             RETURNING *
         `, product.values);
         await adminLog(req, 'product_created', `Created product ${result.rows[0].name} (ID ${result.rows[0].id})`);
@@ -569,9 +1546,9 @@ app.put('/api/admin/products/:id', async (req, res) => {
         const result = await pool.query(`
             UPDATE products
             SET name = $1, description = $2, price = $3, sale_price = $4, image_url = $5,
-                category = $6, stock = $7, product_images = $8::jsonb, size_inventory = $9::jsonb,
-                is_active = $10
-            WHERE id = $11
+                category = $6, stock = $7, categories = $8::jsonb, product_images = $9::jsonb,
+                size_inventory = $10::jsonb, is_active = $11
+            WHERE id = $12
             RETURNING *
         `, [...product.values, id]);
         if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
@@ -642,9 +1619,9 @@ app.post('/api/admin/products/:id/duplicate', async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO products
-                (name, description, price, sale_price, image_url, category, stock, product_images, size_inventory, is_active)
+                (name, description, price, sale_price, image_url, category, stock, categories, product_images, size_inventory, is_active)
             SELECT name || ' (Copy)', description, price, sale_price, image_url, category,
-                   0, product_images, '{}'::jsonb, false
+                   0, categories, product_images, '{}'::jsonb, false
             FROM products
             WHERE id = $1
             RETURNING *
@@ -734,7 +1711,8 @@ app.get('/api/admin/orders', async (req, res) => {
                    o.shipping_city, o.shipping_state, o.shipping_zip, o.shipping_country,
                    o.tracking_number, o.shipping_carrier,
                    COALESCE(o.items, '[]'::jsonb) AS items, o.created_at, o.updated_at,
-                   u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name
+                   COALESCE(u.email, o.customer_email) AS user_email,
+                   u.first_name AS user_first_name, u.last_name AS user_last_name
             FROM orders o
             LEFT JOIN users u ON u.id = o.user_id
             ORDER BY o.created_at DESC, o.id DESC
@@ -759,9 +1737,9 @@ app.get('/api/admin/stats', async (req, res) => {
                 (SELECT COUNT(*)::integer FROM orders WHERE status = 'pending') AS pending_orders,
                 (SELECT COUNT(*)::integer FROM users WHERE created_at >= date_trunc('month', NOW())) AS new_users_this_month,
                 (SELECT COALESCE(SUM(total), 0)::numeric FROM orders
-                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')) AS total_revenue,
+                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled', 'checkout_failed')) AS total_revenue,
                 (SELECT COALESCE(SUM(total), 0)::numeric FROM orders
-                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled', 'checkout_failed')
                     AND created_at >= date_trunc('month', NOW())) AS monthly_revenue,
                 (SELECT COUNT(*)::integer FROM products
                     WHERE is_active = true AND stock > 0 AND stock <= $1) AS low_stock_count
@@ -798,7 +1776,7 @@ app.get('/api/admin/stats/revenue-chart', async (req, res) => {
             ) AS series(day)
             LEFT JOIN orders o
                 ON o.created_at::date = series.day::date
-                AND o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+                AND o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled', 'checkout_failed')
             GROUP BY series.day
             ORDER BY series.day
         `, [days]);
@@ -825,7 +1803,7 @@ app.get('/api/admin/stats/top-products', async (req, res) => {
                        * COALESCE((item->>'price_at_purchase')::numeric, 0)) AS total_revenue
             FROM orders o
             CROSS JOIN LATERAL jsonb_array_elements(COALESCE(o.items, '[]'::jsonb)) AS item
-            WHERE o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+            WHERE o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled', 'checkout_failed')
               AND item->>'id' IS NOT NULL
             GROUP BY item->>'id', item->>'product_name', item->>'product_image'
             ORDER BY total_qty DESC
@@ -1013,7 +1991,7 @@ app.get('/dashboard', serveDashboardPage, (req, res) => {
 app.get('/dashboard.html', serveDashboardPage, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
-app.get('/shop', (req, res) => res.redirect(301, '/shop.html'));
+app.get(['/shop', '/shop.html'], (req, res) => res.redirect(301, '/#shop'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -1089,12 +2067,75 @@ app.get('/api/products', async (req, res) => {
     try {
         if (!pool) return res.status(503).json({ error: 'Product catalog is temporarily unavailable.' });
         const r = await pool.query(
-            'SELECT id, name, description, price, sale_price, image_url, category, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
+            'SELECT id, name, description, price, sale_price, image_url, category, categories, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
         );
         res.json(r.rows);
     } catch (err) {
         console.error('Public products error:', err.message);
         res.status(500).json({ error: 'Unable to load products.' });
+    }
+});
+
+app.get('/api/reviews', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ error: 'Reviews are temporarily unavailable.' });
+        const result = await pool.query(`
+            SELECT reviewer_name, reviewer_location, rating, review_text, created_at
+            FROM product_reviews
+            WHERE is_approved = true
+            ORDER BY created_at DESC, id DESC
+            LIMIT 100
+        `);
+        res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Public reviews error:', error.message);
+        res.status(500).json({ error: 'Unable to load reviews.' });
+    }
+});
+
+app.post('/api/newsletter/subscribe', rateLimit(5, 60 * 60 * 1000), async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+    if (!pool) return res.status(503).json({ error: 'Newsletter signup is temporarily unavailable.' });
+    try {
+        await pool.query(`
+            INSERT INTO newsletter_subscribers (email, is_active)
+            VALUES ($1, true)
+            ON CONFLICT (email) DO UPDATE SET is_active = true
+        `, [email]);
+        res.status(200).json({ ok: true, message: "You're in. Welcome to the culture." });
+    } catch (error) {
+        console.error('Newsletter subscription error:', error.message);
+        res.status(500).json({ error: 'Unable to subscribe right now. Please try again later.' });
+    }
+});
+
+app.get('/api/order-tracking/:orderNumber', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    const orderNumber = typeof req.params.orderNumber === 'string' ? req.params.orderNumber.trim().toUpperCase() : '';
+    const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+    if (!orderNumber || orderNumber.length > 50 || !validEmail(email))
+        return res.status(400).json({ error: 'Enter a valid order number and email address.' });
+    if (!pool) return res.status(503).json({ error: 'Order tracking is temporarily unavailable.' });
+    try {
+        const result = await pool.query(`
+            SELECT o.id, o.order_number, o.status, o.total, o.shipping_first_name,
+                   o.shipping_last_name, o.shipping_address, o.shipping_city, o.shipping_state,
+                   o.shipping_zip, o.shipping_country, o.tracking_number, o.shipping_carrier,
+                   o.created_at, COALESCE(o.items, '[]'::jsonb) AS items
+            FROM orders o
+            LEFT JOIN users u ON u.id = o.user_id
+            WHERE UPPER(o.order_number) = $1
+              AND LOWER(COALESCE(NULLIF(o.customer_email, ''), u.email, '')) = $2
+              AND o.status NOT IN ('abandoned', 'checkout_failed')
+            LIMIT 1
+        `, [orderNumber, email]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Order not found.' });
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Order tracking error:', error.message);
+        res.status(500).json({ error: 'Unable to look up this order.' });
     }
 });
 

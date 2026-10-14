@@ -37,7 +37,7 @@
 
                 <div class="contact-info-block">
                     <div class="contact-info-label">EMAIL</div>
-                    <div class="contact-info-value" id="info-email">contact@davidmyalik.com</div>
+                    <a class="contact-info-value" id="info-email" href="mailto:shopdavidmyalik@gmail.com">shopdavidmyalik@gmail.com</a>
                 </div>
                 <div class="contact-info-block">
                     <div class="contact-info-label">RESPONSE TIME</div>
@@ -121,7 +121,11 @@
             try {
                 const sr = await fetch('/api/settings/all');
                 const s = await sr.json();
-                if (s.contact_email) document.getElementById('info-email').textContent = s.contact_email;
+                if (s.contact_email) {
+                    const email = document.getElementById('info-email');
+                    email.textContent = s.contact_email;
+                    email.href = `mailto:${s.contact_email}`;
+                }
             } catch {}
 
             // Pre-fill from URL params

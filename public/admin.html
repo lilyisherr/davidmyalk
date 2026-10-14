@@ -654,7 +654,7 @@
                         <p class="settings-card-desc">This address is shown on the contact page. Private notification addresses and mail credentials are never part of public settings.</p>
                         <div class="mb-4">
                             <label class="input-label">EMAIL ADDRESS</label>
-                            <input type="email" class="input-field" id="set-contact_email" value="contact@davidmyalik.com">
+                            <input type="email" class="input-field" id="set-contact_email" value="shopdavidmyalik@gmail.com">
                         </div>
                         <button class="btn btn-primary" onclick="saveBulkSettings(['contact_email'])">SAVE CONTACT EMAIL</button>
                     </div>
@@ -841,7 +841,7 @@
                         </div>
                         <div class="grid-2 mb-4">
                             <div><label class="input-label">FROM NAME</label><input type="text" class="input-field" id="set-smtp_from_name" placeholder="David Myalik Store"></div>
-                            <div><label class="input-label">FROM EMAIL</label><input type="email" class="input-field" id="set-smtp_from_email" placeholder="noreply@davidmyalik.com"></div>
+                            <div><label class="input-label">FROM EMAIL</label><input type="email" class="input-field" id="set-smtp_from_email" placeholder="shopdavidmyalik@gmail.com"></div>
                         </div>
                         <div class="mb-4">
                             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
@@ -1357,12 +1357,12 @@
                 </div>
                 <div class="grid-2 mb-4">
                     <div>
-                        <label class="input-label">CATEGORY</label>
-                        <select class="input-field" id="prod-category">
-                            <option value="">Select category...</option>
+                        <label class="input-label">CATEGORIES</label>
+                        <select class="input-field" id="prod-category" multiple size="4" aria-describedby="category-help">
+                            <option value="">No categories yet</option>
                         </select>
-                        <input type="text" class="input-field" id="prod-category-custom" placeholder="Or type custom category..." style="margin-top:8px; display:none;">
-                        <button type="button" onclick="toggleCustomCategory()" style="background:none;border:none;color:var(--primary);font-family:var(--font-mono);font-size:10px;cursor:pointer;margin-top:6px;text-transform:uppercase;letter-spacing:0.1em;" id="custom-cat-toggle">+ Custom Category</button>
+                        <p id="category-help" class="font-mono text-muted" style="font-size:10px;margin-top:6px;">Select multiple categories with Ctrl (Windows) or Command (Mac).</p>
+                        <input type="text" class="input-field" id="prod-category-custom" placeholder="Add categories, separated by commas" style="margin-top:8px;">
                     </div>
                     <div>
                         <label class="input-label">STATUS</label>
@@ -1561,9 +1561,9 @@
                     ? '<span class="badge badge-active">APPROVED</span>'
                     : '<span class="badge badge-inactive">HIDDEN</span>';
                 return `<tr>
-                    <td><div style="font-size:13px;font-weight:600;">${r.reviewer_name}</div>${r.reviewer_location ? `<div class="font-mono text-muted" style="font-size:10px;">${r.reviewer_location}</div>` : ''}</td>
+                    <td><div style="font-size:13px;font-weight:600;">${escapeAdminText(r.reviewer_name)}</div>${r.reviewer_location ? `<div class="font-mono text-muted" style="font-size:10px;">${escapeAdminText(r.reviewer_location)}</div>` : ''}</td>
                     <td><span style="color:#f59e0b;">${stars}</span></td>
-                    <td style="max-width:260px;"><div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.review_text}</div></td>
+                    <td style="max-width:260px;"><div style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeAdminText(r.review_text)}</div></td>
                     <td>${statusBadge}</td>
                     <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(r.created_at).toLocaleDateString()}</td>
                     <td>
@@ -1652,11 +1652,11 @@
                 const sc = statusColors[c.status] || '#888';
                 return `<tr style="${c.status === 'new' ? 'background:rgba(255,0,0,0.03);' : ''}">
                     <td class="font-mono" style="font-size:11px;color:var(--text-muted);">${new Date(c.created_at).toLocaleDateString()}</td>
-                    <td style="font-size:13px;font-weight:${c.status==='new'?'700':'400'};">${c.name}</td>
-                    <td><a href="mailto:${c.email}" class="font-mono" style="font-size:11px;color:var(--primary);">${c.email}</a></td>
-                    <td style="font-size:12px;">${c.subject || '—'}</td>
-                    <td class="font-mono" style="font-size:11px;">${c.order_number || '—'}</td>
-                    <td><span class="font-mono" style="font-size:10px;color:${sc};text-transform:uppercase;">${c.status}</span></td>
+                    <td style="font-size:13px;font-weight:${c.status==='new'?'700':'400'};">${escapeAdminText(c.name)}</td>
+                    <td><a href="mailto:${escapeAdminText(encodeURIComponent(c.email))}" class="font-mono" style="font-size:11px;color:var(--primary);">${escapeAdminText(c.email)}</a></td>
+                    <td style="font-size:12px;">${escapeAdminText(c.subject || '—')}</td>
+                    <td class="font-mono" style="font-size:11px;">${escapeAdminText(c.order_number || '—')}</td>
+                    <td><span class="font-mono" style="font-size:10px;color:${sc};text-transform:uppercase;">${escapeAdminText(c.status)}</span></td>
                     <td><button onclick="viewContact(${c.id})" class="btn btn-secondary btn-sm" style="font-size:10px;">VIEW</button></td>
                 </tr>`;
             }).join('');
@@ -2347,10 +2347,15 @@
 
         async function loadCategories() {
             const res = await fetch('/api/admin/categories');
+            if (!res.ok) throw new Error('Unable to load product categories.');
             categories = await res.json();
             const sel = document.getElementById('prod-category');
-            sel.innerHTML = '<option value="">Select category...</option>' +
-                categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            sel.innerHTML = categories.map(c => {
+                const option = document.createElement('option');
+                option.value = c;
+                option.textContent = c;
+                return option.outerHTML;
+            }).join('') || '<option value="" disabled>No categories yet</option>';
         }
 
         async function loadProducts() {
@@ -2386,7 +2391,7 @@
                             <span class="meta">ID: ${p.id}</span>
                         </div>
                     </div></td>
-                    <td><span class="badge badge-customer">${p.category || 'Uncategorized'}</span></td>
+                    <td>${(Array.isArray(p.categories) ? p.categories : p.category ? [p.category] : []).map(category => `<span class="badge badge-customer">${escapeAdminText(category)}</span>`).join(' ') || '<span class="text-muted">Uncategorized</span>'}</td>
                     <td class="font-mono">${p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price) ? `<span style="color:var(--primary);">$${parseFloat(p.sale_price).toFixed(2)}</span> <span style="text-decoration:line-through;color:var(--text-muted);font-size:11px;">$${parseFloat(p.price).toFixed(2)}</span>` : `$${parseFloat(p.price).toFixed(2)}`}</td>
                     <td class="font-mono ${stockClass}" style="cursor:pointer;" onclick="quickStockEdit(${p.id}, ${p.stock}, this)" title="Click to edit stock">${stockText}</td>
                     <td><span class="badge ${p.is_active ? 'badge-active' : 'badge-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -2422,7 +2427,8 @@
             let filtered = allProducts;
             if (productFilter === 'active') filtered = filtered.filter(p => p.is_active);
             else if (productFilter === 'inactive') filtered = filtered.filter(p => !p.is_active);
-            filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+            filtered = filtered.filter(p => p.name.toLowerCase().includes(q)
+                || (Array.isArray(p.categories) ? p.categories : [p.category || '']).some(category => category.toLowerCase().includes(q)));
             renderProducts(filtered);
         }
 
@@ -2586,7 +2592,8 @@
             document.getElementById('prod-image-url') && (document.getElementById('prod-image-url').value = '');
             document.getElementById('product-modal-title').innerHTML = 'ADD <span class="text-red">PRODUCT</span>';
             document.getElementById('prod-category-custom').style.display = 'none';
-            document.getElementById('custom-cat-toggle').textContent = '+ Custom Category';
+            document.getElementById('prod-category-custom').value = '';
+            Array.from(document.getElementById('prod-category').options).forEach(option => { option.selected = false; });
             clearExtraImages();
             // Reset size inventory
             document.getElementById('prod-use-sizes').checked = false;
@@ -2685,21 +2692,6 @@
             }
         }
 
-        function toggleCustomCategory() {
-            const custom = document.getElementById('prod-category-custom');
-            const toggle = document.getElementById('custom-cat-toggle');
-            if (custom.style.display === 'none') {
-                custom.style.display = 'block';
-                document.getElementById('prod-category').disabled = true;
-                toggle.textContent = '< Use Dropdown';
-            } else {
-                custom.style.display = 'none';
-                custom.value = '';
-                document.getElementById('prod-category').disabled = false;
-                toggle.textContent = '+ Custom Category';
-            }
-        }
-
         async function editProduct(id) {
             const res = await fetch(`/api/admin/products/${id}`);
             if (!res.ok) {
@@ -2717,24 +2709,13 @@
             document.getElementById('prod-active').value = String(p.is_active);
             document.getElementById('prod-image-final').value = p.image_url || '';
 
+            const productCategories = Array.isArray(p.categories) && p.categories.length
+                ? p.categories
+                : p.category ? [p.category] : [];
             const catSel = document.getElementById('prod-category');
-            const catCustom = document.getElementById('prod-category-custom');
-            if (p.category && categories.includes(p.category)) {
-                catSel.value = p.category;
-                catSel.disabled = false;
-                catCustom.style.display = 'none';
-                catCustom.value = '';
-                document.getElementById('custom-cat-toggle').textContent = '+ Custom Category';
-            } else if (p.category) {
-                catSel.disabled = true;
-                catCustom.style.display = 'block';
-                catCustom.value = p.category;
-                document.getElementById('custom-cat-toggle').textContent = '< Use Dropdown';
-            } else {
-                catSel.value = '';
-                catSel.disabled = false;
-                catCustom.style.display = 'none';
-            }
+            Array.from(catSel.options).forEach(option => { option.selected = productCategories.includes(option.value); });
+            document.getElementById('prod-category-custom').value =
+                productCategories.filter(category => !categories.includes(category)).join(', ');
 
             if (p.image_url) {
                 setImageMode('url');
@@ -2772,10 +2753,11 @@
         document.getElementById('product-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('prod-id').value;
-            const catCustom = document.getElementById('prod-category-custom');
-            const category = catCustom.style.display !== 'none' && catCustom.value
-                ? catCustom.value
-                : document.getElementById('prod-category').value;
+            const selectedCategories = Array.from(document.getElementById('prod-category').selectedOptions)
+                .map(option => option.value);
+            const customCategories = document.getElementById('prod-category-custom').value
+                .split(',').map(category => category.trim()).filter(Boolean);
+            const productCategories = [...new Set([...selectedCategories, ...customCategories])];
 
             let imageUrl = document.getElementById('prod-image-final').value;
             if (imageMode === 'url') {
@@ -2798,7 +2780,8 @@
                 price: document.getElementById('prod-price').value,
                 salePrice: salePriceRaw !== '' ? salePriceRaw : null,
                 stock: useSizes ? null : document.getElementById('prod-stock').value,
-                category: category,
+                category: productCategories[0] || '',
+                categories: productCategories,
                 isActive: document.getElementById('prod-active').value === 'true',
                 imageUrl: imageUrl,
                 productImages: getExtraImages(),

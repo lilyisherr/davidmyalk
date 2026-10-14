@@ -128,7 +128,7 @@
                             </div>
                             <div class="mb-4">
                                 <label class="input-label">NEW PASSWORD</label>
-                                <input type="password" class="input-field" id="newPassword" required minlength="6">
+                                <input type="password" class="input-field" id="newPassword" required minlength="12" maxlength="128">
                             </div>
                             <button type="submit" class="btn btn-primary btn-sm">UPDATE PASSWORD</button>
                         </div>
@@ -208,10 +208,10 @@
             const data = await res.json();
             if (!data.user) { window.location.href = '/login'; return; }
             currentUser = data.user;
-            document.getElementById('user-avatar').textContent = currentUser.first_name[0].toUpperCase();
+            document.getElementById('user-avatar').textContent = (currentUser.first_name || currentUser.email || '?')[0].toUpperCase();
             document.getElementById('user-name-display').textContent = currentUser.first_name;
-            document.getElementById('set-firstName').value = currentUser.first_name;
-            document.getElementById('set-lastName').value = currentUser.last_name;
+            document.getElementById('set-firstName').value = currentUser.first_name || '';
+            document.getElementById('set-lastName').value = currentUser.last_name || '';
             document.getElementById('set-email').value = currentUser.email;
             document.getElementById('set-phone').value = currentUser.phone || '';
             loadOrders();
@@ -250,6 +250,7 @@
             try {
                 const res = await fetch('/api/orders');
                 const orders = await res.json();
+                if (!res.ok) throw new Error(orders.error || 'Unable to load your orders.');
                 const newJson = JSON.stringify(orders);
                 if (!silent || newJson !== lastOrdersData) {
                     lastOrdersData = newJson;
@@ -258,7 +259,8 @@
                 const now = new Date();
                 if (lastUpdatedEl) lastUpdatedEl.innerHTML = `<span class="live-dot" id="orders-live-dot"></span>Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
             } catch(e) {
-                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Could not refresh';
+                if (lastUpdatedEl) lastUpdatedEl.textContent = e.message || 'Could not refresh';
+                if (!silent) document.getElementById('orders-list').textContent = e.message || 'Could not load your orders.';
             }
         }
 
@@ -315,6 +317,7 @@
         async function viewOrderDetail(id) {
             const res = await fetch(`/api/orders/${id}`);
             const order = await res.json();
+            if (!res.ok) { showToast(order.error || 'Unable to load this order.', 'error'); return; }
             const content = document.getElementById('order-detail-content');
             content.innerHTML = `
                 <div class="grid-2 mb-6">
@@ -377,18 +380,30 @@
             try {
                 const res = await fetch('/api/user/stats');
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to load account statistics.');
                 document.getElementById('stat-orders').textContent = data.totalOrders;
                 document.getElementById('stat-spent').textContent = `$${data.totalSpent.toFixed(2)}`;
                 document.getElementById('stat-since').textContent = data.memberSince
                     ? new Date(data.memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                     : '—';
-            } catch(e) {}
+            } catch(e) {
+                document.getElementById('stat-orders').textContent = '—';
+                document.getElementById('stat-spent').textContent = 'Unavailable';
+                document.getElementById('stat-since').textContent = '—';
+            }
         }
 
         async function loadAddresses() {
-            const res = await fetch('/api/user/addresses');
-            const addresses = await res.json();
             const container = document.getElementById('addresses-list');
+            let addresses;
+            try {
+                const res = await fetch('/api/user/addresses');
+                addresses = await res.json();
+                if (!res.ok) throw new Error(addresses.error || 'Unable to load your saved addresses.');
+            } catch (error) {
+                container.textContent = error.message || 'Unable to load your saved addresses.';
+                return;
+            }
             if (addresses.length === 0) {
                 container.innerHTML = `<div class="empty-state">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -448,6 +463,7 @@
                 })
             });
             if (res.ok) { showToast('Address saved!', 'success'); closeAddressModal(); loadAddresses(); e.target.reset(); }
+            else { const data = await res.json(); showToast(data.error || 'Unable to save this address.', 'error'); }
         });
 
         document.getElementById('profile-form').addEventListener('submit', async (e) => {
@@ -461,8 +477,13 @@
                     phone: document.getElementById('set-phone').value
                 })
             });
-            if (res.ok) showToast('Profile updated!', 'success');
-            else showToast('Failed to update profile', 'error');
+            const data = await res.json();
+            if (res.ok) {
+                currentUser = data.user;
+                document.getElementById('user-name-display').textContent = currentUser.first_name;
+                document.getElementById('user-avatar').textContent = (currentUser.first_name || currentUser.email || '?')[0].toUpperCase();
+                showToast('Profile updated!', 'success');
+            } else showToast(data.error || 'Failed to update profile', 'error');
         });
 
         document.getElementById('password-form').addEventListener('submit', async (e) => {

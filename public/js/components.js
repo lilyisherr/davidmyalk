@@ -32,7 +32,7 @@ function renderNav(currentUser, options = {}) {
         `;
     }
 
-    const shopHref = isStore ? '#shop' : '/shop.html#shop';
+    const shopHref = isStore ? '#shop' : '/#shop';
     const aboutHref = isStore ? '#about' : '/#about';
     const contactHref = '/contact';
 
@@ -114,7 +114,7 @@ async function renderFooter() {
                     </div>
                     <div>
                         <div class="footer-col-title">Company</div>
-                        <a href="/shop.html" class="footer-link">Shop</a>
+                        <a href="/#shop" class="footer-link">Shop</a>
                         <a href="/#about" class="footer-link">About Us</a>
                         <a href="/contact" class="footer-link">Contact</a>
                         <a href="/tracking" class="footer-link">Track Order</a>
