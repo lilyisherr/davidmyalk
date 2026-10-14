@@ -38,3 +38,9 @@ For a contact auto-reply, enable and save the contact auto-reply template on the
 Gmail SMTP is suitable for initial low-volume testing, but it has sending limits and is not a bulk-mail service. Use a dedicated sender account, follow Google's sending rules, and move to a transactional email provider when order volume grows. Verify that `SMTP_FROM_EMAIL` is an address Gmail is allowed to send as.
 
 The app needs a PostgreSQL `DATABASE_URL` and a long random `SESSION_SECRET` for accounts and settings. Set `BOOTSTRAP_ADMIN_EMAIL` to the exact email address that should become the store owner **before** that address signs up. Public signups are customers; the first account is no longer automatically an administrator. Set Stripe's live keys separately before accepting real payments.
+
+## If accounts or admin data appear missing
+
+`server.js` reads `DATABASE_URL` directly. In Vercel, make sure it is enabled for the environment serving the site (usually **Production**, not only Preview), and redeploy after changing it. All deployments using the same database URL share that database; changing the URL points the site at a different set of users, orders, and settings. The admin dashboard lists accounts that exist in that connected database; it does not migrate accounts from another database.
+
+Admin account and activity endpoints are available only to signed-in users whose database role is `admin` or `owner`. The activity log can show only actions actually written to the log table; it cannot reconstruct events from before they were recorded.

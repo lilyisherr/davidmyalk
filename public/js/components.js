@@ -152,7 +152,6 @@ async function renderFooter() {
                         <div class="footer-col-title">Support</div>
                         <a href="/contact" class="footer-link">Help Center</a>
                         <a href="/shipping-info" class="footer-link">Shipping Info</a>
-                        <a href="/returns" class="footer-link">Returns & Exchanges</a>
                         <a href="javascript:void(0)" onclick="openSizeGuideGlobal()" class="footer-link">Size Guide</a>
                     </div>
                     <div>

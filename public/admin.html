@@ -591,10 +591,11 @@
                 <div class="admin-header">
                     <div>
                         <h2 class="admin-title">ACTIVITY <span class="text-red">LOG</span></h2>
-                        <p class="admin-subtitle">Track all admin actions across the site</p>
+                        <p class="admin-subtitle">Recent recorded admin activity</p>
                     </div>
                     <button class="btn btn-secondary btn-sm" onclick="loadLogs()">REFRESH</button>
                 </div>
+                <p class="font-mono text-xs text-muted" style="margin:-16px 0 20px;">Settings changes are recorded going forward. Older activity cannot be reconstructed.</p>
                 <div class="search-bar">
                     <input type="text" class="search-input" placeholder="Search logs by admin name, action, details..." id="log-search" oninput="filterLogs()">
                 </div>
@@ -632,9 +633,9 @@
                             <button class="settings-nav-btn" data-tab="notifications" onclick="showSettingsTab('notifications')">Notifications</button>
                             <button class="settings-nav-btn" data-tab="storefront" onclick="showSettingsTab('storefront')" hidden>Storefront Sections</button>
                         </div>
-                        <div class="settings-nav-group" hidden>
+                        <div class="settings-nav-group">
                             <span class="settings-nav-label">Advanced</span>
-                            <button class="settings-nav-btn" data-tab="policies" onclick="showSettingsTab('policies')" hidden>Policies</button>
+                            <button class="settings-nav-btn" data-tab="policies" onclick="showSettingsTab('policies')">Policies</button>
                             <button class="settings-nav-btn" data-tab="customcode" onclick="showSettingsTab('customcode')" hidden>Custom Code</button>
                             <button class="settings-nav-btn" data-tab="webhooks" onclick="showSettingsTab('webhooks')" hidden>Webhooks</button>
                             <button class="settings-nav-btn" data-tab="advanced" onclick="showSettingsTab('advanced')" hidden>Advanced</button>
@@ -1195,10 +1196,18 @@
                 </div>
 
                 <!-- POLICIES TAB -->
-                <div class="settings-panel" id="stab-policies" style="display:none;" hidden>
+                <div class="settings-panel" id="stab-policies" style="display:none;">
+                    <div class="card" style="max-width:700px;">
+                        <h3 class="settings-card-title">TERMS OF <span class="text-red">SERVICE</span></h3>
+                        <p class="settings-card-desc">Publish the terms that apply to orders and use of your store. Replace this text with policies that accurately reflect your business and have them reviewed before launch.</p>
+                        <div class="mb-4">
+                            <textarea class="input-field" id="set-policy_terms" style="min-height:180px;" placeholder="Add your store's terms of service..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['policy_terms'])">SAVE TERMS</button>
+                    </div>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">RETURN <span class="text-red">POLICY</span></h3>
-                        <p class="settings-card-desc">Tell customers exactly how returns and exchanges work. This text appears on your Returns page and in the help center.</p>
+                        <p class="settings-card-desc">Tell customers how returns and exchanges work. This policy is not linked from the storefront footer.</p>
                         <div class="mb-4">
                             <textarea class="input-field" id="set-policy_returns" style="min-height:140px;"></textarea>
                         </div>
@@ -1467,8 +1476,9 @@
                 return;
             }
             currentUser = data.user;
-            document.getElementById('user-avatar').textContent = currentUser.first_name[0].toUpperCase();
-            document.getElementById('user-name-display').textContent = currentUser.first_name;
+            const displayName = currentUser.first_name || currentUser.email || 'Admin';
+            document.getElementById('user-avatar').textContent = displayName[0].toUpperCase();
+            document.getElementById('user-name-display').textContent = currentUser.first_name || 'Admin';
             updateDateTime();
             setInterval(updateDateTime, 60000);
             loadAll();
@@ -1491,7 +1501,7 @@
         }
 
         async function loadAll() {
-            await Promise.all([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts(), loadRevenueChart(7), loadTopProducts()]);
+            await Promise.allSettled([loadStats(), loadOrders(), loadProducts(), loadUsers(), loadCategories(), loadSettings(), loadLogs(), loadDiscounts(), loadRevenueChart(7), loadTopProducts()]);
         }
 
         // ─── EXTRA IMAGES ─────────────────────────────────────────────────────
@@ -1682,9 +1692,13 @@
         async function loadLogs() {
             try {
                 const res = await fetch('/api/admin/logs');
+                if (!res.ok) throw new Error('Activity log request failed.');
                 allLogs = await res.json();
                 renderLogs(allLogs);
-            } catch(e) {}
+            } catch (error) {
+                console.error('Unable to load activity log:', error);
+                document.getElementById('logs-list').innerHTML = '<div class="empty-state"><p>Activity could not be loaded. Refresh and try again.</p></div>';
+            }
         }
 
         function renderLogs(logs) {
@@ -1767,7 +1781,7 @@
                 'checkout_terms_text','maintenance_message','low_stock_threshold',
                 'banner_text','banner_link','banner_color',
                 'seo_title','seo_description','seo_keywords','seo_og_image',
-                'policy_returns','policy_shipping','policy_privacy',
+                'policy_returns','policy_shipping','policy_privacy','policy_terms',
                 'admin_notification_email','order_confirmation_message',
                 'order_processing_days','order_shipping_days',
                 // Analytics
@@ -2302,15 +2316,16 @@
 
         async function loadStats() {
             const res = await fetch('/api/admin/stats');
+            if (!res.ok) throw new Error('Dashboard statistics request failed.');
             const stats = await res.json();
-            document.getElementById('stat-revenue').textContent = '$' + stats.totalRevenue.toFixed(2);
-            document.getElementById('stat-orders').textContent = stats.totalOrders;
-            document.getElementById('stat-users').textContent = stats.totalUsers;
-            document.getElementById('stat-products').textContent = stats.totalProducts;
-            document.getElementById('stat-monthly-rev').textContent = '$' + stats.monthlyRevenue.toFixed(2);
-            document.getElementById('stat-pending').textContent = stats.pendingOrders;
-            document.getElementById('stat-new-users').textContent = stats.newUsersThisMonth;
-            document.getElementById('stat-low-stock').textContent = stats.lowStockCount;
+            document.getElementById('stat-revenue').textContent = '$' + Number(stats.totalRevenue || 0).toFixed(2);
+            document.getElementById('stat-orders').textContent = Number(stats.totalOrders || 0);
+            document.getElementById('stat-users').textContent = Number(stats.totalUsers || 0);
+            document.getElementById('stat-products').textContent = Number(stats.totalProducts || 0);
+            document.getElementById('stat-monthly-rev').textContent = '$' + Number(stats.monthlyRevenue || 0).toFixed(2);
+            document.getElementById('stat-pending').textContent = Number(stats.pendingOrders || 0);
+            document.getElementById('stat-new-users').textContent = Number(stats.newUsersThisMonth || 0);
+            document.getElementById('stat-low-stock').textContent = Number(stats.lowStockCount || 0);
         }
 
         async function loadCategories() {
@@ -2474,38 +2489,52 @@
         }
 
         async function loadUsers() {
-            const res = await fetch('/api/admin/users');
-            allUsers = await res.json();
-            renderUsers(allUsers);
+            try {
+                const res = await fetch('/api/admin/users');
+                if (!res.ok) throw new Error('Users request failed.');
+                allUsers = await res.json();
+                renderUsers(allUsers);
+            } catch (error) {
+                console.error('Unable to load users:', error);
+                document.getElementById('users-table').innerHTML = '<tr><td colspan="6" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">Users could not be loaded. Refresh and try again.</td></tr>';
+            }
+        }
+
+        function escapeAdminText(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[character]);
         }
 
         function renderUsers(users) {
-            document.getElementById('users-table').innerHTML = users.map(u => `<tr>
+            document.getElementById('users-table').innerHTML = users.map(u => {
+                const firstName = u.first_name || '';
+                const lastName = u.last_name || '';
+                const role = u.role || 'customer';
+                return `<tr>
                 <td><div class="user-row">
-                    <div class="user-avatar-sm">${u.first_name[0].toUpperCase()}</div>
+                    <div class="user-avatar-sm">${escapeAdminText((firstName || u.email || '?')[0].toUpperCase())}</div>
                     <div class="user-info">
-                        <span class="name">${u.first_name} ${u.last_name}</span>
+                        <span class="name">${escapeAdminText(firstName)} ${escapeAdminText(lastName)}</span>
                     </div>
                 </div></td>
-                <td class="font-mono text-xs">${u.email}</td>
-                <td><span class="badge badge-${u.role === 'owner' ? 'admin' : u.role}">${u.role}</span></td>
-                <td class="font-mono">${u.order_count}</td>
+                <td class="font-mono text-xs">${escapeAdminText(u.email)}</td>
+                <td><span class="badge badge-${escapeAdminText(role === 'owner' ? 'admin' : role)}">${escapeAdminText(role)}</span></td>
+                <td class="font-mono">${Number(u.order_count) || 0}</td>
                 <td class="font-mono text-xs">${new Date(u.created_at).toLocaleDateString()}</td>
                 <td>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-secondary btn-sm" onclick="viewUser(${u.id})">VIEW</button>
-                        <button class="btn btn-secondary btn-sm" onclick="editUser(${u.id})" style="color:var(--primary);border-color:rgba(255,0,0,0.3);">EDIT</button>
-                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="viewUser(${Number(u.id)})">VIEW</button>
                 </td>
-            </tr>`).join('') || '<tr><td colspan="6" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">No users found</td></tr>';
+            </tr>`;
+            }).join('') || '<tr><td colspan="6" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">No users found</td></tr>';
         }
 
         function filterUsers() {
             const q = document.getElementById('user-search').value.toLowerCase();
             const filtered = allUsers.filter(u =>
-                u.first_name.toLowerCase().includes(q) ||
-                u.last_name.toLowerCase().includes(q) ||
-                u.email.toLowerCase().includes(q)
+                (u.first_name || '').toLowerCase().includes(q) ||
+                (u.last_name || '').toLowerCase().includes(q) ||
+                (u.email || '').toLowerCase().includes(q)
             );
             renderUsers(filtered);
         }
@@ -2912,17 +2941,22 @@
         }
 
         async function viewUser(id) {
-            const res = await fetch(`/api/admin/users/${id}`);
-            const data = await res.json();
-            const u = data.user;
+            try {
+                const res = await fetch(`/api/admin/users/${id}`);
+                if (!res.ok) throw new Error('User details request failed.');
+                const data = await res.json();
+                const u = data.user;
+            const firstName = u.first_name || '';
+            const lastName = u.last_name || '';
+            const role = u.role || 'customer';
             document.getElementById('user-modal-title').innerHTML = 'USER <span class="text-red">DETAILS</span>';
             document.getElementById('user-detail-content').innerHTML = `
                 <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
-                    <div class="user-avatar-sm" style="width:56px;height:56px;font-size:22px;">${u.first_name[0].toUpperCase()}</div>
+                    <div class="user-avatar-sm" style="width:56px;height:56px;font-size:22px;">${escapeAdminText((firstName || u.email || '?')[0].toUpperCase())}</div>
                     <div>
-                        <h3 style="font-size:22px;font-family:var(--font-display);">${u.first_name} ${u.last_name}</h3>
+                        <h3 style="font-size:22px;font-family:var(--font-display);">${escapeAdminText(firstName)} ${escapeAdminText(lastName)}</h3>
                         <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
-                            <span class="badge badge-${u.role === 'owner' ? 'admin' : u.role}">${u.role}</span>
+                            <span class="badge badge-${escapeAdminText(role === 'owner' ? 'admin' : role)}">${escapeAdminText(role)}</span>
                             <span class="font-mono text-xs text-muted">Joined ${new Date(u.created_at).toLocaleDateString()}</span>
                         </div>
                     </div>
@@ -2931,24 +2965,20 @@
                 <div class="user-detail-grid mb-4">
                     <div class="detail-field">
                         <div class="label">Email</div>
-                        <div class="value">${u.email}</div>
+                        <div class="value">${escapeAdminText(u.email)}</div>
                     </div>
                     <div class="detail-field">
                         <div class="label">User ID</div>
-                        <div class="value font-mono">${u.id}</div>
+                        <div class="value font-mono">${Number(u.id)}</div>
                     </div>
                     <div class="detail-field">
                         <div class="label">Role</div>
-                        <div class="value">${u.role}</div>
+                        <div class="value">${escapeAdminText(role)}</div>
                     </div>
-                </div>
-
-                <div class="section-card mb-4">
-                    <div class="font-mono text-xs text-muted mb-4" style="display:flex;justify-content:space-between;align-items:center;">
-                        <span>PASSWORD HASH</span>
-                        <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'; this.textContent=this.textContent==='SHOW'?'HIDE':'SHOW';" class="btn btn-secondary" style="font-size:9px;padding:2px 8px;clip-path:none;">SHOW</button>
+                    <div class="detail-field">
+                        <div class="label">Phone</div>
+                        <div class="value">${escapeAdminText(u.phone || 'Not provided')}</div>
                     </div>
-                    <div class="value password-hash" style="display:none;word-break:break-all;">${u.password_hash || 'N/A'}</div>
                 </div>
 
                 ${data.addresses.length ? `
@@ -2956,9 +2986,9 @@
                         <div class="font-mono text-xs text-muted mb-4">SAVED ADDRESSES</div>
                         ${data.addresses.map(a => `
                             <div style="padding:10px 0;border-bottom:1px solid var(--border);">
-                                <p class="text-sm" style="font-weight:600;">${a.first_name} ${a.last_name}</p>
-                                <p class="text-muted text-xs">${a.address_line1}${a.address_line2?', '+a.address_line2:''}</p>
-                                <p class="text-muted text-xs">${a.city}${a.state?', '+a.state:''} ${a.zip}, ${a.country}</p>
+                                <p class="text-sm" style="font-weight:600;">${escapeAdminText(a.first_name)} ${escapeAdminText(a.last_name)}</p>
+                                <p class="text-muted text-xs">${escapeAdminText(a.address_line1)}${a.address_line2?', '+escapeAdminText(a.address_line2):''}</p>
+                                <p class="text-muted text-xs">${escapeAdminText(a.city)}${a.state?', '+escapeAdminText(a.state):''} ${escapeAdminText(a.zip)}, ${escapeAdminText(a.country)}</p>
                             </div>
                         `).join('')}
                     </div>
@@ -2971,105 +3001,22 @@
                             <div class="activity-item" style="cursor:pointer;" onclick="closeUserModal();viewOrder(${o.id});">
                                 <div class="activity-dot ${o.status === 'delivered' ? 'green' : o.status === 'pending' ? 'yellow' : o.status === 'cancelled' ? 'red' : 'blue'}"></div>
                                 <div style="flex:1;">
-                                    <span class="font-mono text-xs">${o.order_number}</span>
+                                    <span class="font-mono text-xs">${escapeAdminText(o.order_number)}</span>
                                     <span class="text-muted text-xs" style="margin-left:8px;">${new Date(o.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <span class="badge badge-${o.status}" style="font-size:9px;padding:2px 6px;">${o.status}</span>
-                                <span class="font-mono text-sm" style="margin-left:8px;">$${parseFloat(o.total).toFixed(2)}</span>
+                                <span class="badge badge-${escapeAdminText(o.status)}" style="font-size:9px;padding:2px 6px;">${escapeAdminText(o.status)}</span>
+                                <span class="font-mono text-sm" style="margin-left:8px;">$${Number(o.total || 0).toFixed(2)}</span>
                             </div>
                         `).join('')}
                     </div>
                 ` : '<div class="section-card"><span class="font-mono text-xs text-muted">No orders yet</span></div>'}
 
-                <div style="margin-top:16px;display:flex;gap:12px;">
-                    <button class="btn btn-primary btn-sm" onclick="closeUserModal();editUser(${u.id});">EDIT USER</button>
-                    ${u.role !== 'owner' ? `<button class="btn btn-danger btn-sm" style="clip-path:none;" onclick="deleteUser(${u.id})">DELETE USER</button>` : ''}
-                </div>
             `;
-            document.getElementById('user-modal').classList.add('open');
-        }
-
-        async function editUser(id) {
-            const res = await fetch(`/api/admin/users/${id}`);
-            const data = await res.json();
-            const u = data.user;
-            document.getElementById('user-modal-title').innerHTML = 'EDIT <span class="text-red">USER</span>';
-            document.getElementById('user-detail-content').innerHTML = `
-                <form id="edit-user-form">
-                    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                        <div class="user-avatar-sm" style="width:48px;height:48px;font-size:20px;">${u.first_name[0].toUpperCase()}</div>
-                        <div>
-                            <div class="font-display" style="font-size:18px;">EDITING USER #${u.id}</div>
-                            <span class="badge badge-${u.role === 'owner' ? 'admin' : u.role}">${u.role}</span>
-                        </div>
-                    </div>
-                    <div class="grid-2 mb-4">
-                        <div><label class="input-label">FIRST NAME</label><input type="text" class="input-field" id="edit-first" value="${u.first_name}" required></div>
-                        <div><label class="input-label">LAST NAME</label><input type="text" class="input-field" id="edit-last" value="${u.last_name}" required></div>
-                    </div>
-                    <div class="mb-4"><label class="input-label">EMAIL</label><input type="email" class="input-field" id="edit-email" value="${u.email}" required></div>
-                    ${u.role !== 'owner' && currentUser.role === 'owner' ? `
-                        <div class="mb-4">
-                            <label class="input-label">ROLE</label>
-                            <select class="input-field" id="edit-role">
-                                <option value="customer" ${u.role==='customer'?'selected':''}>Customer</option>
-                                <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-                            </select>
-                        </div>
-                    ` : ''}
-                    <div class="section-card mb-4" style="border-color:rgba(255,0,0,0.2);">
-                        <div class="font-mono text-xs mb-4" style="color:var(--primary);">PASSWORD MANAGEMENT</div>
-                        <div class="detail-field mb-4">
-                            <div class="label">CURRENT PASSWORD HASH</div>
-                            <div class="value password-hash">${u.password_hash || 'N/A'}</div>
-                        </div>
-                        <div><label class="input-label">SET NEW PASSWORD</label><input type="text" class="input-field" id="edit-password" placeholder="Leave blank to keep current (min 6 chars)"></div>
-                    </div>
-                    <div style="display:flex;gap:12px;">
-                        <button type="submit" class="btn btn-primary btn-sm">SAVE CHANGES</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeUserModal()">CANCEL</button>
-                    </div>
-                    ${u.role !== 'owner' ? `
-                        <div class="delete-zone">
-                            <div class="font-mono text-xs mb-4" style="color:#ef4444;">DANGER ZONE</div>
-                            <button type="button" class="btn btn-danger btn-sm" style="clip-path:none;" onclick="deleteUser(${u.id})">DELETE THIS USER</button>
-                        </div>
-                    ` : ''}
-                </form>
-            `;
-            document.getElementById('user-modal').classList.add('open');
-
-            document.getElementById('edit-user-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const payload = {
-                    firstName: document.getElementById('edit-first').value,
-                    lastName: document.getElementById('edit-last').value,
-                    email: document.getElementById('edit-email').value,
-                };
-                const roleEl = document.getElementById('edit-role');
-                if (roleEl) payload.role = roleEl.value;
-                const pw = document.getElementById('edit-password').value;
-                if (pw) {
-                    if (pw.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
-                    payload.newPassword = pw;
-                }
-                const res = await fetch(`/api/admin/users/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await res.json();
-                if (res.ok) { showToast('User updated!', 'success'); closeUserModal(); loadUsers(); }
-                else showToast(result.error || 'Failed to update', 'error');
-            });
-        }
-
-        async function deleteUser(id) {
-            if (!confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
-            const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (res.ok) { showToast('User deleted', 'success'); closeUserModal(); loadUsers(); loadStats(); }
-            else showToast(data.error || 'Failed', 'error');
+                document.getElementById('user-modal').classList.add('open');
+            } catch (error) {
+                console.error('Unable to load user details:', error);
+                showToast('Unable to load user details.', 'error');
+            }
         }
 
         function closeUserModal() { document.getElementById('user-modal').classList.remove('open'); }
