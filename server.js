@@ -35,6 +35,7 @@ const ADMIN_SETTING_KEYS = [
     'email_contact_auto_reply_enabled', 'email_contact_auto_reply_subject', 'email_contact_auto_reply_body',
     'policy_returns', 'policy_shipping', 'policy_privacy', 'policy_terms'
 ];
+const DEFAULT_PRODUCT_CATEGORIES = ['Apparel', 'Hats', 'Stickers', 'Accessories', 'Decals', 'Home & Garage'];
 let dbInitialization = null;
 
 // Support Vercel/Neon environment variable names alongside standard DATABASE_URL
@@ -93,6 +94,7 @@ async function initDb() {
             sale_price DECIMAL(10,2) DEFAULT NULL,
             image_url VARCHAR(500) DEFAULT '',
             category VARCHAR(100) DEFAULT '',
+            product_type VARCHAR(100) DEFAULT '',
             stock INTEGER DEFAULT 0,
             categories JSONB DEFAULT '[]',
             product_images JSONB DEFAULT '[]',
@@ -211,6 +213,7 @@ async function initDb() {
     await pool.query(`
         ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS categories JSONB DEFAULT '[]';
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type VARCHAR(100) DEFAULT '';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT '';
@@ -296,6 +299,7 @@ function normalizeProduct(input) {
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const description = typeof input.description === 'string' ? input.description : '';
     const legacyCategory = typeof input.category === 'string' ? input.category.trim() : '';
+    const productType = typeof input.productType === 'string' ? input.productType.trim() : '';
     const categoriesInput = input.categories === undefined ? (legacyCategory ? [legacyCategory] : []) : input.categories;
     if (!Array.isArray(categoriesInput) || categoriesInput.length > 20
         || categoriesInput.some(category => typeof category !== 'string' || !category.trim() || category.trim().length > 100))
@@ -318,7 +322,7 @@ function normalizeProduct(input) {
     if (!Number.isFinite(price) || price < 0) return { error: 'Enter a valid product price.' };
     if (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 0))
         return { error: 'Enter a valid sale price.' };
-    if (description.length > 10000 || imageUrl.length > 500)
+    if (description.length > 10000 || imageUrl.length > 500 || productType.length > 100)
         return { error: 'One or more product fields are too long.' };
     if (typeof input.isActive !== 'boolean') return { error: 'Product visibility must be selected.' };
     if (!Array.isArray(productImages) || productImages.length > 19
@@ -338,7 +342,7 @@ function normalizeProduct(input) {
 
     return {
         values: [
-            name, description, price, salePrice, imageUrl, category, rawStock, JSON.stringify(categories),
+            name, description, price, salePrice, imageUrl, category, productType, rawStock, JSON.stringify(categories),
             JSON.stringify(productImages), JSON.stringify(sizeInventory || {}),
             input.isActive
         ]
@@ -867,8 +871,12 @@ app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
     if (!stripe) return res.status(503).json({ error: 'Online checkout is not configured yet. Please try again later.' });
     const cart = normalizeCheckoutCart(req.body && req.body.cart);
     const shipping = normalizeShipping(req.body && req.body.shipping);
+    const checkoutEmail = req.user
+        ? req.user.email
+        : typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     if (cart.error) return res.status(400).json({ error: cart.error });
     if (shipping.error) return res.status(400).json({ error: shipping.error });
+    if (!validEmail(checkoutEmail)) return res.status(400).json({ error: 'Enter a valid email address for order updates.' });
     try {
         const settings = await readSettings([
             'shipping_cost', 'free_shipping_threshold', 'min_order_amount',
@@ -927,7 +935,7 @@ app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
         const shippingCost = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold
             ? 0
             : Math.max(0, Number(settings.shipping_cost) || 0);
-        const discountCode = typeof req.body.discountCode === 'string' ? req.body.discountCode.trim().slice(0, 50) : '';
+        const discountCode = typeof req.body?.discountCode === 'string' ? req.body.discountCode.trim().slice(0, 50) : '';
         const discount = await getValidDiscount(discountCode, subtotal);
         const total = Math.max(0, Math.round((subtotal + shippingCost - discount.amount) * 100) / 100);
         if (total <= 0) return res.status(400).json({ error: 'Order total must be greater than zero.' });
@@ -944,7 +952,7 @@ app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
             RETURNING id
         `, [
             orderNumber, req.user ? req.user.id : null, subtotal, shippingCost, total,
-            req.user ? req.user.email : '',
+            checkoutEmail,
             shipping.fields.first_name, shipping.fields.last_name, shipping.fields.address_line1,
             shipping.fields.city, shipping.fields.state, shipping.fields.zip, shipping.fields.country,
             discount.amount, discount.code, JSON.stringify(orderItems)
@@ -956,6 +964,7 @@ app.post('/api/checkout', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
             ).join(', ').slice(0, 500);
             const session = await stripe.checkout.sessions.create({
                 mode: 'payment',
+                customer_email: checkoutEmail,
                 line_items: [{
                     quantity: 1,
                     price_data: {
@@ -1489,6 +1498,7 @@ app.get('/api/admin/categories', async (req, res) => {
                 if (typeof category === 'string' && category.trim()) categories.add(category.trim());
             });
         }
+        DEFAULT_PRODUCT_CATEGORIES.forEach(category => categories.add(category));
         res.json([...categories].sort((a, b) => a.localeCompare(b)));
     } catch (error) {
         console.error('Admin categories error:', error.message);
@@ -1525,8 +1535,8 @@ app.post('/api/admin/products', async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO products
-                (name, description, price, sale_price, image_url, category, stock, categories, product_images, size_inventory, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11)
+                (name, description, price, sale_price, image_url, category, product_type, stock, categories, product_images, size_inventory, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12)
             RETURNING *
         `, product.values);
         await adminLog(req, 'product_created', `Created product ${result.rows[0].name} (ID ${result.rows[0].id})`);
@@ -1546,9 +1556,9 @@ app.put('/api/admin/products/:id', async (req, res) => {
         const result = await pool.query(`
             UPDATE products
             SET name = $1, description = $2, price = $3, sale_price = $4, image_url = $5,
-                category = $6, stock = $7, categories = $8::jsonb, product_images = $9::jsonb,
-                size_inventory = $10::jsonb, is_active = $11
-            WHERE id = $12
+                category = $6, product_type = $7, stock = $8, categories = $9::jsonb, product_images = $10::jsonb,
+                size_inventory = $11::jsonb, is_active = $12
+            WHERE id = $13
             RETURNING *
         `, [...product.values, id]);
         if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
@@ -1619,8 +1629,8 @@ app.post('/api/admin/products/:id/duplicate', async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO products
-                (name, description, price, sale_price, image_url, category, stock, categories, product_images, size_inventory, is_active)
-            SELECT name || ' (Copy)', description, price, sale_price, image_url, category,
+                (name, description, price, sale_price, image_url, category, product_type, stock, categories, product_images, size_inventory, is_active)
+            SELECT name || ' (Copy)', description, price, sale_price, image_url, category, product_type,
                    0, categories, product_images, '{}'::jsonb, false
             FROM products
             WHERE id = $1
@@ -2067,7 +2077,7 @@ app.get('/api/products', async (req, res) => {
     try {
         if (!pool) return res.status(503).json({ error: 'Product catalog is temporarily unavailable.' });
         const r = await pool.query(
-            'SELECT id, name, description, price, sale_price, image_url, category, categories, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
+            'SELECT id, name, description, price, sale_price, image_url, category, categories, product_type, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
         );
         res.json(r.rows);
     } catch (err) {

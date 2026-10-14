@@ -218,6 +218,10 @@
                 </div>
                 <a href="#" class="nav-link" onclick="logout()" style="color:#ef4444;">Logout</a>
             </div>
+            <a href="/?cart=open#shop" aria-label="Open shopping cart" style="position:relative;color:white;padding:8px;margin-left:12px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"></circle><circle cx="19" cy="21" r="1.5"></circle><path d="M2.5 3h2l2.4 10.2a1 1 0 0 0 1 .8h9.8a1 1 0 0 0 1-.8L18.5 6H5"></path></svg>
+                <span id="cart-count" style="position:absolute;top:0;right:0;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);">0</span>
+            </a>
             <button class="mobile-menu-toggle" onclick="document.getElementById('mobile-menu').classList.add('open')">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
@@ -1365,6 +1369,17 @@
                         <input type="text" class="input-field" id="prod-category-custom" placeholder="Add categories, separated by commas" style="margin-top:8px;">
                     </div>
                     <div>
+                        <label class="input-label" for="prod-type">PRODUCT TYPE</label>
+                        <input type="text" class="input-field" id="prod-type" list="product-type-options" maxlength="100" placeholder="Shirts, hoodies, pants, stickers...">
+                        <datalist id="product-type-options">
+                            <option value="T-Shirts"></option><option value="Long Sleeves"></option>
+                            <option value="Hoodies"></option><option value="Sweatshirts"></option>
+                            <option value="Pants"></option><option value="Shorts"></option>
+                            <option value="Jackets"></option><option value="Hats"></option>
+                            <option value="Stickers"></option><option value="Decals"></option>
+                            <option value="Accessories"></option><option value="Other"></option>
+                        </datalist>
+                        <p class="font-mono text-muted" style="font-size:10px;margin:6px 0 14px;">Used for the shop's product-type filters.</p>
                         <label class="input-label">STATUS</label>
                         <select class="input-field" id="prod-active">
                             <option value="true">Active</option>
@@ -2391,7 +2406,7 @@
                             <span class="meta">ID: ${p.id}</span>
                         </div>
                     </div></td>
-                    <td>${(Array.isArray(p.categories) ? p.categories : p.category ? [p.category] : []).map(category => `<span class="badge badge-customer">${escapeAdminText(category)}</span>`).join(' ') || '<span class="text-muted">Uncategorized</span>'}</td>
+                    <td>${(Array.isArray(p.categories) ? p.categories : p.category ? [p.category] : []).map(category => `<span class="badge badge-customer">${escapeAdminText(category)}</span>`).join(' ') || '<span class="text-muted">Uncategorized</span>'}${p.product_type ? `<div class="font-mono text-muted" style="font-size:10px;margin-top:5px;">${escapeAdminText(p.product_type)}</div>` : ''}</td>
                     <td class="font-mono">${p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price) ? `<span style="color:var(--primary);">$${parseFloat(p.sale_price).toFixed(2)}</span> <span style="text-decoration:line-through;color:var(--text-muted);font-size:11px;">$${parseFloat(p.price).toFixed(2)}</span>` : `$${parseFloat(p.price).toFixed(2)}`}</td>
                     <td class="font-mono ${stockClass}" style="cursor:pointer;" onclick="quickStockEdit(${p.id}, ${p.stock}, this)" title="Click to edit stock">${stockText}</td>
                     <td><span class="badge ${p.is_active ? 'badge-active' : 'badge-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -2428,7 +2443,8 @@
             if (productFilter === 'active') filtered = filtered.filter(p => p.is_active);
             else if (productFilter === 'inactive') filtered = filtered.filter(p => !p.is_active);
             filtered = filtered.filter(p => p.name.toLowerCase().includes(q)
-                || (Array.isArray(p.categories) ? p.categories : [p.category || '']).some(category => category.toLowerCase().includes(q)));
+                || (Array.isArray(p.categories) ? p.categories : [p.category || '']).some(category => category.toLowerCase().includes(q))
+                || String(p.product_type || '').toLowerCase().includes(q));
             renderProducts(filtered);
         }
 
@@ -2590,6 +2606,7 @@
             resetUploadArea();
             document.getElementById('url-preview').innerHTML = '';
             document.getElementById('prod-image-url') && (document.getElementById('prod-image-url').value = '');
+            document.getElementById('prod-type').value = '';
             document.getElementById('product-modal-title').innerHTML = 'ADD <span class="text-red">PRODUCT</span>';
             document.getElementById('prod-category-custom').style.display = 'none';
             document.getElementById('prod-category-custom').value = '';
@@ -2708,6 +2725,7 @@
             document.getElementById('prod-stock').value = p.stock;
             document.getElementById('prod-active').value = String(p.is_active);
             document.getElementById('prod-image-final').value = p.image_url || '';
+            document.getElementById('prod-type').value = p.product_type || '';
 
             const productCategories = Array.isArray(p.categories) && p.categories.length
                 ? p.categories
@@ -2782,6 +2800,7 @@
                 stock: useSizes ? null : document.getElementById('prod-stock').value,
                 category: productCategories[0] || '',
                 categories: productCategories,
+                productType: document.getElementById('prod-type').value.trim(),
                 isActive: document.getElementById('prod-active').value === 'true',
                 imageUrl: imageUrl,
                 productImages: getExtraImages(),
@@ -3088,6 +3107,23 @@
         });
 
         init();
+    </script>
+    <script>
+        (() => {
+            const badge = document.getElementById('cart-count');
+            const sync = () => {
+                try {
+                    const items = JSON.parse(localStorage.getItem('dm-cart') || '[]');
+                    const count = Array.isArray(items) ? items.reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0) : 0;
+                    badge.textContent = String(count);
+                    badge.style.display = count ? 'block' : 'none';
+                } catch (error) {
+                    console.warn('Unable to read saved cart count:', error);
+                }
+            };
+            sync();
+            window.addEventListener('storage', event => { if (event.key === 'dm-cart') sync(); });
+        })();
     </script>
 </body>
 </html>

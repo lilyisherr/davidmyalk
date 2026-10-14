@@ -46,12 +46,11 @@ function renderNav(currentUser, options = {}) {
                     <a href="${contactHref}" class="nav-link">CONTACT</a>
                     <a href="javascript:void(0)" class="nav-link" onclick="document.getElementById('size-guide-modal')&&(document.getElementById('size-guide-modal').style.display='flex')" style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.12em;">SIZE GUIDE</a>
                     ${authHTML}
-                    ${isStore ? `
-                    <button id="cart-btn" style="position:relative;background:none;border:none;color:white;cursor:pointer;" aria-label="Cart">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"></circle><circle cx="19" cy="21" r="1.5"></circle><path d="M2.5 3h2l2.4 10.2a1 1 0 0 0 1 .8h9.8a1 1 0 0 0 1-.8L18.5 6H5"></path></svg>
-                        <span id="cart-count" style="position:absolute;top:-8px;right:-8px;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);">0</span>
-                    </button>` : ''}
                 </div>
+                <button id="cart-btn" onclick="openSiteCart()" style="position:relative;background:none;border:none;color:white;cursor:pointer;padding:8px;margin-left:12px;" aria-label="Open shopping cart">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"></circle><circle cx="19" cy="21" r="1.5"></circle><path d="M2.5 3h2l2.4 10.2a1 1 0 0 0 1 .8h9.8a1 1 0 0 0 1-.8L18.5 6H5"></path></svg>
+                    <span id="cart-count" style="position:absolute;top:0;right:0;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);">0</span>
+                </button>
                 <button class="mobile-menu-toggle" id="mobile-menu-btn" aria-label="Menu">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
@@ -73,7 +72,134 @@ function renderNav(currentUser, options = {}) {
     function closeMobileMenu() { mobileMenu.classList.remove('open'); }
     closeMenuBtn.addEventListener('click', closeMobileMenu);
     document.querySelectorAll('.mobile-link').forEach(l => l.addEventListener('click', closeMobileMenu));
+    syncNavCartCount();
 }
+
+function syncNavCartCount() {
+    const badge = document.getElementById('cart-count');
+    if (!badge) return;
+    let count = 0;
+    try {
+        const items = JSON.parse(localStorage.getItem('dm-cart') || '[]');
+        if (Array.isArray(items)) count = items.reduce((total, item) => total + Math.max(0, Number(item.qty) || 0), 0);
+    } catch (error) {
+        console.warn('Unable to read the saved cart:', error);
+    }
+    badge.textContent = String(count);
+    badge.style.display = count ? 'block' : 'none';
+}
+
+function openSiteCart() {
+    if (document.getElementById('cart-sidebar') && typeof window.toggleCart === 'function') {
+        window.toggleCart();
+        return;
+    }
+    ensureSharedCartDrawer();
+    renderSharedCart();
+    document.getElementById('shared-cart-overlay').style.display = 'block';
+    requestAnimationFrame(() => document.getElementById('shared-cart-drawer').style.transform = 'translateX(0)');
+}
+
+function closeSharedCart() {
+    const overlay = document.getElementById('shared-cart-overlay');
+    const drawer = document.getElementById('shared-cart-drawer');
+    if (!overlay || !drawer) return;
+    drawer.style.transform = 'translateX(100%)';
+    setTimeout(() => { overlay.style.display = 'none'; }, 250);
+}
+
+function ensureSharedCartDrawer() {
+    if (document.getElementById('shared-cart-drawer')) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div id="shared-cart-overlay" onclick="closeSharedCart()" style="display:none;position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.82);"></div>
+        <aside id="shared-cart-drawer" aria-label="Shopping cart" style="position:fixed;z-index:99991;top:0;right:0;width:min(100%,450px);height:100vh;height:100dvh;background:#0b1120;border-left:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;">
+            <div style="padding:22px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;">
+                <h2 style="margin:0;color:#fff;font:24px Anton,sans-serif;letter-spacing:.1em;">YOUR <span style="color:#ff0000;">HAUL</span></h2>
+                <button type="button" onclick="closeSharedCart()" aria-label="Close cart" style="background:none;border:0;color:#fff;font-size:24px;cursor:pointer;">&times;</button>
+            </div>
+            <div id="shared-cart-items" style="flex:1;overflow-y:auto;padding:24px;"></div>
+            <div id="shared-cart-footer" style="padding:20px 24px;border-top:1px solid rgba(255,255,255,.1);">
+                <div style="display:flex;justify-content:space-between;color:#fff;font:22px Anton,sans-serif;margin-bottom:16px;"><span>SUBTOTAL</span><span id="shared-cart-total" style="color:#ff0000;">$0.00</span></div>
+                <button type="button" onclick="continueSharedCheckout()" style="width:100%;padding:15px;background:#ff0000;border:0;color:#fff;font:16px Anton,sans-serif;letter-spacing:.12em;cursor:pointer;">CONTINUE TO CHECKOUT</button>
+            </div>
+        </aside>`;
+    document.body.appendChild(wrapper);
+}
+
+function readSharedCart() {
+    try {
+        const cart = JSON.parse(localStorage.getItem('dm-cart') || '[]');
+        return Array.isArray(cart) ? cart : [];
+    } catch (error) {
+        console.warn('Unable to read the saved cart:', error);
+        return [];
+    }
+}
+
+function escapeSharedCartText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+
+function renderSharedCart() {
+    const cart = readSharedCart();
+    const items = document.getElementById('shared-cart-items');
+    const footer = document.getElementById('shared-cart-footer');
+    const total = cart.reduce((sum, item) => sum + (Math.max(0, Number(item.price) || 0) * Math.max(0, Number(item.qty) || 0)), 0);
+    if (!cart.length) {
+        items.innerHTML = '<p style="padding:48px 0;text-align:center;color:rgba(255,255,255,.6);font:12px JetBrains Mono,monospace;">Your cart is empty.</p>';
+        footer.style.display = 'none';
+    } else {
+        items.innerHTML = cart.map((item, index) => {
+            const rawImage = String(item.image_url || '');
+            const image = (/^https:\/\//i.test(rawImage) || /^\/(?!\/)/.test(rawImage)) ? rawImage : '/images/og-image.png';
+            const price = Math.max(0, Number(item.price) || 0);
+            const quantity = Math.max(1, Number(item.qty) || 1);
+            return `<div style="display:flex;gap:12px;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.1);">
+                <img src="${escapeSharedCartText(image)}" alt="" style="width:58px;height:66px;object-fit:cover;background:#111;">
+                <div style="flex:1;min-width:0;color:#fff;">
+                    <div style="font:600 13px Oswald,sans-serif;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeSharedCartText(item.name || 'Product')}</div>
+                    ${item.size ? `<div style="margin-top:4px;color:#ff0000;font:10px JetBrains Mono,monospace;">SIZE: ${escapeSharedCartText(item.size)}</div>` : ''}
+                    <div style="margin-top:5px;color:rgba(255,255,255,.6);font:11px JetBrains Mono,monospace;">$${price.toFixed(2)} each</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                        <button type="button" data-cart-index="${index}" data-cart-delta="-1" aria-label="Decrease quantity" style="width:28px;height:28px;background:#151b2b;border:1px solid rgba(255,255,255,.15);color:#fff;">−</button>
+                        <span style="font:12px JetBrains Mono,monospace;">${quantity}</span>
+                        <button type="button" data-cart-index="${index}" data-cart-delta="1" aria-label="Increase quantity" style="width:28px;height:28px;background:#151b2b;border:1px solid rgba(255,255,255,.15);color:#fff;">+</button>
+                        <button type="button" data-remove-cart-index="${index}" style="margin-left:auto;background:none;border:0;color:#ef4444;font:10px JetBrains Mono,monospace;">REMOVE</button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        footer.style.display = 'block';
+    }
+    document.getElementById('shared-cart-total').textContent = `$${total.toFixed(2)}`;
+    items.querySelectorAll('[data-cart-index]').forEach(button => button.addEventListener('click', () => {
+        updateSharedCart(Number(button.dataset.cartIndex), Number(button.dataset.cartDelta));
+    }));
+    items.querySelectorAll('[data-remove-cart-index]').forEach(button => button.addEventListener('click', () => {
+        updateSharedCart(Number(button.dataset.removeCartIndex), 0);
+    }));
+}
+
+function updateSharedCart(index, delta) {
+    const cart = readSharedCart();
+    if (!Number.isInteger(index) || index < 0 || index >= cart.length) return;
+    cart[index].qty = delta === 0 ? 0 : (Number(cart[index].qty) || 1) + delta;
+    const updated = cart.filter(item => Number(item.qty) > 0);
+    localStorage.setItem('dm-cart', JSON.stringify(updated));
+    syncNavCartCount();
+    renderSharedCart();
+}
+
+function continueSharedCheckout() {
+    window.location.href = '/?checkout=start#shop';
+}
+
+window.addEventListener('storage', event => {
+    if (event.key === 'dm-cart') syncNavCartCount();
+});
 
 const SOCIAL_ICONS = {
     youtube: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .5 6.186C0 8.07 0 12 0 12s0 3.93.5 5.814a3.016 3.016 0 0 0 2.123 2.136c1.872.505 9.377.505 9.377.505s7.505 0 9.377-.505a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',

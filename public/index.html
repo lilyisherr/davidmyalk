@@ -203,6 +203,13 @@
         .filter-count {
             margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.2);
         }
+        .shop-search {
+            width: 100%; max-width: 520px; background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border); color: white; padding: 13px 16px;
+            font: 12px var(--font-mono); letter-spacing: 0.06em; outline: none;
+            margin-bottom: 20px;
+        }
+        .shop-search:focus { border-color: var(--primary); }
         .sort-select {
             width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
             color: white; padding: 10px 12px; font-family: var(--font-mono); font-size: 11px;
@@ -469,6 +476,7 @@
                         </select>
                     </div>
                     <form id="shipping-form" onsubmit="event.preventDefault(); goToCheckoutStep(2);">
+                        <div class="mb-4"><label class="input-label" for="ship-email">EMAIL FOR ORDER UPDATES</label><input type="email" class="input-field" id="ship-email" required autocomplete="email" placeholder="you@example.com"></div>
                         <div class="grid-2 mb-4">
                             <div><label class="input-label">FIRST NAME</label><input type="text" class="input-field" id="ship-fname" required></div>
                             <div><label class="input-label">LAST NAME</label><input type="text" class="input-field" id="ship-lname" required></div>
@@ -595,19 +603,27 @@
 
                     <div class="filter-section">
                         <div class="filter-title" onclick="toggleFilterSection(this)">
+                            Product Type
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                        <div class="filter-body" id="product-type-filters"></div>
+                    </div>
+
+                    <div class="filter-section">
+                        <div class="filter-title" onclick="toggleFilterSection(this)">
                             Availability
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                         </div>
                         <div class="filter-body" id="availability-filters">
-                            <div class="filter-item active" onclick="setAvailability('all')">
+                            <div class="filter-item active" data-availability="all" onclick="setAvailability('all')">
                                 <span class="filter-radio"></span>
                                 All Items
                             </div>
-                            <div class="filter-item" onclick="setAvailability('in-stock')">
+                            <div class="filter-item" data-availability="in-stock" onclick="setAvailability('in-stock')">
                                 <span class="filter-radio"></span>
                                 In Stock Only
                             </div>
-                            <div class="filter-item" onclick="setAvailability('on-sale')">
+                            <div class="filter-item" data-availability="on-sale" onclick="setAvailability('on-sale')">
                                 <span class="filter-radio"></span>
                                 On Sale
                             </div>
@@ -649,6 +665,7 @@
                 </div>
 
                 <div class="shop-main">
+                    <input type="search" id="product-search" class="shop-search" placeholder="Search shirts, hoodies, stickers..." aria-label="Search products" oninput="applyFilters()">
                     <div id="product-count" class="product-count"></div>
                     <div id="product-grid" class="product-grid"></div>
                     <div id="no-products" style="display:none;text-align:center;padding:80px 0;">
@@ -753,6 +770,8 @@
         let cart = [];
         let currentUser = null;
         let activeCategory = 'all';
+        let activeProductType = 'all';
+        let activeSearch = '';
         let activeSort = 'default';
         let activeAvailability = 'all';
         let activePriceRange = 'all';
@@ -804,14 +823,18 @@
                 if (!authResult.value.ok) throw new Error(`Authentication request failed (${authResult.value.status}).`);
                 const authData = await authResult.value.json();
                 currentUser = authData.user || null;
+                if (currentUser && document.getElementById('ship-email')) {
+                    document.getElementById('ship-email').value = currentUser.email || '';
+                }
             } catch { currentUser = null; }
 
-            cart = cart.filter(item => products.some(p => p.id === item.id && p.is_active));
-            saveCart();
+            if (!productLoadFailed) {
+                cart = cart.filter(item => products.some(p => String(p.id) === String(item.id) && p.is_active));
+                saveCart();
+            }
 
             renderNav(currentUser, { isStore: true });
             renderFooter();
-            document.getElementById('cart-btn').addEventListener('click', toggleCart);
 
             try {
                 const [shipRes, grindRes, allSettingsRes] = await Promise.all([
@@ -909,6 +932,9 @@
             initScrollAnimations();
             initMobileFilters();
             handleCheckoutReturn();
+            const checkoutParams = new URLSearchParams(window.location.search);
+            if (checkoutParams.get('cart') === 'open') toggleCart();
+            if (checkoutParams.get('checkout') === 'start') startCheckout();
         }
 
         async function submitNewsletter(e) {
@@ -992,6 +1018,7 @@
             el.nextElementSibling.classList.toggle('collapsed');
         }
 
+        const DEFAULT_STORE_CATEGORIES = ['Apparel', 'Hats', 'Stickers', 'Accessories', 'Decals', 'Home & Garage'];
         function getCategories() {
             const cats = {};
             products.forEach(p => {
@@ -999,6 +1026,10 @@
                     const key = category.toLowerCase();
                     cats[key] = (cats[key] || 0) + 1;
                 });
+            });
+            DEFAULT_STORE_CATEGORIES.forEach(category => {
+                const key = category.toLowerCase();
+                if (!(key in cats)) cats[key] = 0;
             });
             return Object.entries(cats).sort((a, b) => a[0].localeCompare(b[0]));
         }
@@ -1036,6 +1067,53 @@
             container.querySelectorAll('[data-category]').forEach(item => {
                 item.addEventListener('click', () => setCategory(item.dataset.category));
             });
+            renderProductTypeFilters();
+        }
+
+        function getProductType(product) {
+            const explicitType = typeof product.product_type === 'string' ? product.product_type.trim() : '';
+            if (explicitType) return explicitType;
+            const text = `${product.name || ''} ${getProductCategories(product).join(' ')}`.toLowerCase();
+            if (/\bsticker(s)?\b/.test(text)) return 'Stickers';
+            if (/\b(decal|vinyl)\b/.test(text)) return 'Decals';
+            if (/\b(hoodie|hooded)\b/.test(text)) return 'Hoodies';
+            if (/\b(sweatshirt|crewneck)\b/.test(text)) return 'Sweatshirts';
+            if (/\b(pants?|trousers|joggers)\b/.test(text)) return 'Pants';
+            if (/\b(shorts?)\b/.test(text)) return 'Shorts';
+            if (/\b(jackets?|windbreakers?)\b/.test(text)) return 'Jackets';
+            if (/\b(hats?|caps?|beanies?)\b/.test(text)) return 'Hats';
+            if (/\b(long[\s-]?sleeve)\b/.test(text)) return 'Long Sleeves';
+            if (/\b(t[\s-]?shirts?|tees?)\b/.test(text)) return 'T-Shirts';
+            if (/\b(accessor(y|ies)|bags?|keychains?)\b/.test(text)) return 'Accessories';
+            if (getProductCategories(product).some(category => category.toLowerCase() === 'apparel')) return 'Other Apparel';
+            return '';
+        }
+
+        function renderProductTypeFilters() {
+            const container = document.getElementById('product-type-filters');
+            if (!container) return;
+            const matchingProducts = activeCategory === 'all'
+                ? products
+                : products.filter(product => getProductCategories(product).some(category => category.toLowerCase() === activeCategory));
+            const counts = new Map();
+            matchingProducts.forEach(product => {
+                const type = getProductType(product);
+                if (type) counts.set(type, (counts.get(type) || 0) + 1);
+            });
+            const types = [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+            if (activeProductType !== 'all' && !counts.has(activeProductType)) activeProductType = 'all';
+            let html = `<div class="filter-item ${activeProductType === 'all' ? 'active' : ''}" data-product-type="all">
+                <span class="filter-radio"></span>All Types<span class="filter-count">${matchingProducts.length}</span>
+            </div>`;
+            types.forEach(([type, count]) => {
+                html += `<div class="filter-item ${activeProductType === type ? 'active' : ''}" data-product-type="${escapeStoreHtml(type)}">
+                    <span class="filter-radio"></span>${escapeStoreHtml(type)}<span class="filter-count">${count}</span>
+                </div>`;
+            });
+            container.innerHTML = html;
+            container.querySelectorAll('[data-product-type]').forEach(item => {
+                item.addEventListener('click', () => setProductType(item.dataset.productType));
+            });
         }
 
         function closeMobileFilters() {
@@ -1043,12 +1121,16 @@
             document.getElementById('mobile-filter-backdrop').classList.remove('open');
         }
 
-        function setCategory(cat) { activeCategory = cat; applyFilters(); closeMobileFilters(); }
+        function setCategory(cat) { activeCategory = cat; activeProductType = 'all'; applyFilters(); closeMobileFilters(); }
+        function setProductType(type) { activeProductType = type; applyFilters(); closeMobileFilters(); }
         function setAvailability(val) { activeAvailability = val; applyFilters(); closeMobileFilters(); }
         function setPriceRange(val) { activePriceRange = val; applyFilters(); closeMobileFilters(); }
 
         function clearAllFilters() {
             activeCategory = 'all';
+            activeProductType = 'all';
+            document.getElementById('product-search').value = '';
+            activeSearch = '';
             activeSort = 'default';
             activeAvailability = 'all';
             activePriceRange = 'all';
@@ -1058,6 +1140,7 @@
 
         function applyFilters() {
             activeSort = document.getElementById('sort-select').value;
+            activeSearch = document.getElementById('product-search').value.trim().toLowerCase();
             renderCategoryFilters();
             updateAvailabilityUI();
             updatePriceUI();
@@ -1066,12 +1149,9 @@
         }
 
         function updateAvailabilityUI() {
-            document.querySelectorAll('#availability-filters .filter-item').forEach(el => {
-                el.classList.remove('active');
+            document.querySelectorAll('#availability-filters [data-availability]').forEach(el => {
+                el.classList.toggle('active', el.dataset.availability === activeAvailability);
             });
-            const items = document.querySelectorAll('#availability-filters .filter-item');
-            if (activeAvailability === 'all') items[0].classList.add('active');
-            else items[1].classList.add('active');
         }
 
         function updatePriceUI() {
@@ -1086,6 +1166,13 @@
 
             if (activeCategory !== 'all') {
                 filtered = filtered.filter(p => getProductCategories(p).some(category => category.toLowerCase() === activeCategory));
+            }
+            if (activeProductType !== 'all')
+                filtered = filtered.filter(product => getProductType(product) === activeProductType);
+            if (activeSearch) {
+                filtered = filtered.filter(product => [
+                    product.name, product.description, ...getProductCategories(product), getProductType(product)
+                ].some(value => String(value || '').toLowerCase().includes(activeSearch)));
             }
             if (activeAvailability === 'in-stock') {
                 filtered = filtered.filter(p => p.stock > 0);
@@ -1140,7 +1227,8 @@
                     stockHTML = `<span class="stock-badge low">ONLY ${p.stock} LEFT</span>`;
                 }
                 const isOutOfStock = p.stock <= 0;
-                const catTag = getProductCategories(p).map(category => `<p class="product-category-tag">${escapeStoreHtml(category)}</p>`).join('');
+                const productTags = [...new Set([...getProductCategories(p), getProductType(p)].filter(Boolean))];
+                const catTag = productTags.map(category => `<p class="product-category-tag">${escapeStoreHtml(category)}</p>`).join('');
                 const hasSale = p.sale_price !== null && p.sale_price !== undefined && parseFloat(p.sale_price) < parseFloat(p.price);
                 const displayPrice = hasSale ? parseFloat(p.sale_price) : parseFloat(p.price);
                 const salePct = hasSale ? Math.round((1 - parseFloat(p.sale_price) / parseFloat(p.price)) * 100) : 0;
@@ -1501,7 +1589,6 @@
 
         function startCheckout() {
             if (cart.length === 0) { showToast('Your cart is empty!', 'error'); return; }
-            if (!currentUser) { window.location.href = '/login'; return; }
             toggleCart();
             document.getElementById('checkout-modal').style.display = 'flex';
             goToCheckoutStep(1);
@@ -1637,12 +1724,13 @@
                 zip: document.getElementById('ship-zip').value,
                 country: document.getElementById('ship-country').value
             };
+            const email = document.getElementById('ship-email').value.trim();
 
             try {
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, shipping, discountCode: appliedDiscount?.code || '' })
+                    body: JSON.stringify({ cart, shipping, email, discountCode: appliedDiscount?.code || '' })
                 });
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.url) {
