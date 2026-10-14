@@ -25,6 +25,10 @@
                 </div>
                 <a href="#" class="nav-link" onclick="logout()" style="color:#ef4444;">Logout</a>
             </div>
+            <a href="/?cart=open#shop" aria-label="Open shopping cart" style="position:relative;color:white;padding:8px;margin-left:12px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"></circle><circle cx="19" cy="21" r="1.5"></circle><path d="M2.5 3h2l2.4 10.2a1 1 0 0 0 1 .8h9.8a1 1 0 0 0 1-.8L18.5 6H5"></path></svg>
+                <span id="cart-count" style="position:absolute;top:0;right:0;background:var(--primary);font-size:9px;font-weight:900;padding:2px 6px;border-radius:50%;font-family:var(--font-mono);">0</span>
+            </a>
             <button class="mobile-menu-toggle" onclick="document.getElementById('mobile-menu').classList.add('open')">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
@@ -516,6 +520,23 @@
         }
 
         init();
+    </script>
+    <script>
+        (() => {
+            const badge = document.getElementById('cart-count');
+            const sync = () => {
+                try {
+                    const items = JSON.parse(localStorage.getItem('dm-cart') || '[]');
+                    const count = Array.isArray(items) ? items.reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0) : 0;
+                    badge.textContent = String(count);
+                    badge.style.display = count ? 'block' : 'none';
+                } catch (error) {
+                    console.warn('Unable to read saved cart count:', error);
+                }
+            };
+            sync();
+            window.addEventListener('storage', event => { if (event.key === 'dm-cart') sync(); });
+        })();
     </script>
 </body>
 </html>
