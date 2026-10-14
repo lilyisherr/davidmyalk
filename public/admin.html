@@ -1382,9 +1382,9 @@
                         <div class="image-upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
                             <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <div class="upload-text">Click to upload or <span>drag &amp; drop</span></div>
-                            <div class="upload-text">JPG, PNG, GIF, WebP (max 10MB)</div>
+                            <div class="upload-text">Upload multiple JPG, PNG, GIF, WebP, or AVIF images (4MB each)</div>
                         </div>
-                        <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect(this)">
+                        <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" multiple style="display:none;" onchange="handleFileSelect(this)">
                     </div>
                     <div id="url-mode" style="display:none;">
                         <input type="url" class="input-field" id="prod-image-url" placeholder="https://example.com/image.jpg" oninput="previewUrlImage()">
@@ -1507,10 +1507,24 @@
         // ─── EXTRA IMAGES ─────────────────────────────────────────────────────
         function addExtraImageField(value = '') {
             const list = document.getElementById('extra-images-list');
+            if (list.children.length >= 19) {
+                showToast('A product can have up to 20 images.', 'error');
+                return;
+            }
             const row = document.createElement('div');
             row.style.cssText = 'display:flex;gap:8px;align-items:center;';
-            row.innerHTML = `<input type="url" class="input-field" value="${value}" placeholder="https://example.com/extra.jpg" style="flex:1;">
-                <button type="button" onclick="this.parentElement.remove()" style="background:none;border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-family:var(--font-mono);font-size:11px;padding:8px 12px;cursor:pointer;">✕</button>`;
+            const input = document.createElement('input');
+            input.type = 'url';
+            input.className = 'input-field';
+            input.value = value;
+            input.placeholder = 'https://example.com/extra.jpg';
+            input.style.flex = '1';
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '✕';
+            remove.style.cssText = 'background:none;border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-family:var(--font-mono);font-size:11px;padding:8px 12px;cursor:pointer;';
+            remove.addEventListener('click', () => row.remove());
+            row.append(input, remove);
             list.appendChild(row);
         }
 
@@ -2614,36 +2628,48 @@
             document.getElementById('upload-area').innerHTML = `
                 <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <div class="upload-text">Click to upload or <span>drag & drop</span></div>
-                <div class="upload-text">JPG, PNG, GIF, WebP (max 10MB)</div>`;
+                <div class="upload-text">JPG, PNG, GIF, WebP, or AVIF (max 4MB each)</div>`;
             document.getElementById('upload-area').classList.remove('has-image');
         }
 
         async function handleFileSelect(input) {
-            if (!input.files || !input.files[0]) return;
-            const file = input.files[0];
-            if (file.size > 10 * 1024 * 1024) { showToast('File too large (max 10MB)', 'error'); return; }
+            const files = Array.from(input.files || []);
+            if (!files.length) return;
+            const currentCount = getExtraImages().length + (document.getElementById('prod-image-final').value ? 1 : 0);
+            if (files.length + currentCount > 20) {
+                showToast('A product can have up to 20 images.', 'error');
+                input.value = '';
+                return;
+            }
 
             const area = document.getElementById('upload-area');
-            area.innerHTML = '<div class="loading-spinner"></div><div class="upload-text">Uploading...</div>';
-
-            const formData = new FormData();
-            formData.append('image', file);
+            area.innerHTML = `<div class="loading-spinner"></div><div class="upload-text">Uploading ${files.length} image${files.length === 1 ? '' : 's'}...</div>`;
+            let uploadedCount = 0;
             try {
-                const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (res.ok) {
-                    uploadedImageUrl = data.url;
-                    document.getElementById('prod-image-final').value = data.url;
-                    area.innerHTML = `<img src="${data.url}" alt="Preview">`;
-                    area.classList.add('has-image');
-                    showToast('Image uploaded!', 'success');
-                } else {
-                    showToast(data.error || 'Upload failed', 'error');
-                    resetUploadArea();
+                for (const file of files) {
+                    if (file.size > 4 * 1024 * 1024) throw new Error(`${file.name} is over the 4MB limit.`);
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.url) throw new Error(data.error || `Upload failed (${res.status}).`);
+                    const primary = document.getElementById('prod-image-final');
+                    if (!primary.value) {
+                        primary.value = data.url;
+                        uploadedImageUrl = data.url;
+                        setImageMode('upload');
+                        area.innerHTML = `<img src="${data.url}" alt="Product image preview">`;
+                        area.classList.add('has-image');
+                    } else {
+                        addExtraImageField(data.url);
+                    }
+                    uploadedCount++;
                 }
+                showToast(`${uploadedCount} image${uploadedCount === 1 ? '' : 's'} uploaded. Save the product to publish them.`, 'success');
             } catch (err) {
-                showToast('Upload failed', 'error');
-                resetUploadArea();
+                showToast(err.message || 'Upload failed', 'error');
+                if (uploadedCount) showToast('Some images uploaded; save the product to keep them.', 'error');
+                if (!document.getElementById('prod-image-final').value) resetUploadArea();
             }
             input.value = '';
         }
@@ -3068,11 +3094,11 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.style.borderColor = '';
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
+            const files = Array.from(e.dataTransfer.files || []);
+            if (files.length && files.every(file => file.type.startsWith('image/'))) {
                 const input = document.getElementById('file-input');
                 const dt = new DataTransfer();
-                dt.items.add(file);
+                files.forEach(file => dt.items.add(file));
                 input.files = dt.files;
                 handleFileSelect(input);
             }
