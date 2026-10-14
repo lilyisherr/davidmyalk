@@ -89,16 +89,10 @@ async function renderFooter() {
     if (!container) return;
 
     let socials = [];
-    let ordersShipped = 0;
     try {
-        const [socialsRes, statsRes] = await Promise.all([
-            fetch('/api/settings/socials'),
-            fetch('/api/store-stats')
-        ]);
+        const socialsRes = await fetch('/api/settings/socials');
         const socialsData = await socialsRes.json();
         if (Array.isArray(socialsData)) socials = socialsData;
-        const statsData = await statsRes.json();
-        ordersShipped = statsData.ordersShipped || 0;
     } catch(e) {}
 
     const enabledSocials = socials.filter(s => s.enabled && s.url);
@@ -110,32 +104,9 @@ async function renderFooter() {
         `<a href="${s.url.replace(/"/g, '&quot;')}" target="_blank" class="footer-link">${s.name.replace(/</g, '&lt;')}</a>`
     ).join('');
 
-    const shippedLabel = ordersShipped >= 1000
-        ? (ordersShipped / 1000).toFixed(1).replace(/\.0$/, '') + 'K+'
-        : ordersShipped > 0 ? ordersShipped + '+' : '—';
-
-    const statsBarHTML = ordersShipped > 0 ? `
-        <div style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:20px 0;margin-bottom:32px;display:flex;gap:40px;justify-content:center;flex-wrap:wrap;">
-            <div style="text-align:center;">
-                <div style="font-family:var(--font-display);font-size:28px;color:var(--primary);">${shippedLabel}</div>
-                <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;color:var(--text-muted);margin-top:4px;">ORDERS SHIPPED</div>
-            </div>
-            <div style="width:1px;background:var(--border);"></div>
-            <div style="text-align:center;">
-                <div style="font-family:var(--font-display);font-size:28px;color:var(--primary);">24–48H</div>
-                <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;color:var(--text-muted);margin-top:4px;">RESPONSE TIME</div>
-            </div>
-            <div style="width:1px;background:var(--border);"></div>
-            <div style="text-align:center;">
-                <div style="font-family:var(--font-display);font-size:28px;color:var(--primary);">100%</div>
-                <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;color:var(--text-muted);margin-top:4px;">DRIFT CULTURE</div>
-            </div>
-        </div>` : '';
-
     container.innerHTML = `
         <footer class="site-footer">
             <div class="footer-inner">
-                ${statsBarHTML}
                 <div class="footer-top">
                     <div>
                         <div class="footer-brand">DAVID <span class="text-red">MYALIK</span></div>

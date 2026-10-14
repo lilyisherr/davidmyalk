@@ -207,15 +207,25 @@ async function initDb() {
     await pool.query(`
         ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT '';
     `);
 
     // Basic migrations left out for brevity in this serverless-friendly copy
 }
 
+function initializeDatabase() {
+    if (!dbInitialization) {
+        dbInitialization = initDb().catch(error => {
+            dbInitialization = null;
+            throw error;
+        });
+    }
+    return dbInitialization;
+}
+
 function ensureDatabaseInitialized(req, res, next) {
     if (!pool) return next();
-    if (!dbInitialization) dbInitialization = initDb();
-    dbInitialization.then(next).catch(error => {
+    initializeDatabase().then(next).catch(error => {
         console.error('Database initialization error:', error.message);
         res.status(503).json({ error: 'Database services are temporarily unavailable.' });
     });
@@ -455,17 +465,14 @@ app.get('/api/admin/settings', async (req, res) => {
 app.get('/api/admin/users', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.created_at,
-                   COUNT(o.id)::integer AS order_count
-            FROM users u
-            LEFT JOIN orders o ON o.user_id = u.id
-            GROUP BY u.id
-            ORDER BY u.created_at DESC, u.id DESC
+            SELECT id, email, first_name, last_name, role, created_at
+            FROM users
+            ORDER BY created_at DESC, id DESC
         `);
         res.json(result.rows);
     } catch (error) {
         console.error('Admin users error:', error.message);
-        res.status(500).json({ error: 'Unable to load users.' });
+        res.status(500).json({ error: 'Unable to load users. Check the database schema and server logs.' });
     }
 });
 
@@ -507,6 +514,27 @@ app.get('/api/admin/logs', async (req, res) => {
     }
 });
 
+app.get('/api/admin/orders', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT o.id, o.order_number, o.user_id, o.status, o.subtotal, o.shipping_cost,
+                   o.total, o.shipping_first_name, o.shipping_last_name, o.shipping_address,
+                   o.shipping_city, o.shipping_state, o.shipping_zip, o.shipping_country,
+                   o.tracking_number, o.shipping_carrier,
+                   COALESCE(o.items, '[]'::jsonb) AS items, o.created_at, o.updated_at,
+                   u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name
+            FROM orders o
+            LEFT JOIN users u ON u.id = o.user_id
+            ORDER BY o.created_at DESC, o.id DESC
+        `);
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin orders error:', error.message);
+        res.status(500).json({ error: 'Unable to load orders. Check the database schema and server logs.' });
+    }
+});
+
 app.get('/api/admin/stats', async (req, res) => {
     try {
         const settings = await readSettings(['low_stock_threshold']);
@@ -540,6 +568,62 @@ app.get('/api/admin/stats', async (req, res) => {
     } catch (error) {
         console.error('Admin statistics error:', error.message);
         res.status(500).json({ error: 'Unable to load dashboard statistics.' });
+    }
+});
+
+app.get('/api/admin/stats/revenue-chart', async (req, res) => {
+    const requestedDays = Number.parseInt(req.query.days, 10) || 30;
+    const days = Math.min(Math.max(requestedDays, 1), 365);
+    try {
+        const result = await pool.query(`
+            SELECT series.day::date AS date,
+                   COALESCE(SUM(o.total), 0)::numeric AS revenue,
+                   COUNT(o.id)::integer AS orders
+            FROM generate_series(
+                CURRENT_DATE - ($1::integer - 1),
+                CURRENT_DATE,
+                INTERVAL '1 day'
+            ) AS series(day)
+            LEFT JOIN orders o
+                ON o.created_at::date = series.day::date
+                AND o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+            GROUP BY series.day
+            ORDER BY series.day
+        `, [days]);
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows.map(row => ({
+            date: row.date.toISOString().slice(0, 10),
+            revenue: Number(row.revenue),
+            orders: row.orders
+        })));
+    } catch (error) {
+        console.error('Admin revenue chart error:', error.message);
+        res.status(500).json({ error: 'Unable to load revenue data.' });
+    }
+});
+
+app.get('/api/admin/stats/top-products', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT item->>'id' AS product_id,
+                   item->>'product_name' AS name,
+                   item->>'product_image' AS image,
+                   SUM(COALESCE((item->>'quantity')::integer, 0))::integer AS total_qty,
+                   SUM(COALESCE((item->>'quantity')::numeric, 0)
+                       * COALESCE((item->>'price_at_purchase')::numeric, 0)) AS total_revenue
+            FROM orders o
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(o.items, '[]'::jsonb)) AS item
+            WHERE o.status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+              AND item->>'id' IS NOT NULL
+            GROUP BY item->>'id', item->>'product_name', item->>'product_image'
+            ORDER BY total_qty DESC
+            LIMIT 5
+        `);
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin top products error:', error.message);
+        res.status(500).json({ error: 'Unable to load top products.' });
     }
 });
 
@@ -689,8 +773,7 @@ async function serveAdminPage(req, res, next) {
         return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
     if (!pool) return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
     try {
-        if (!dbInitialization) dbInitialization = initDb();
-        await dbInitialization;
+        await initializeDatabase();
         const result = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
         if (!result.rows.length || !ADMIN_ROLES.has(result.rows[0].role))
             return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
@@ -721,17 +804,6 @@ app.get('/dashboard.html', serveDashboardPage, (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
-app.get('/api/store-stats', async (req, res) => {
-    if (!pool) return res.status(503).json({ error: 'Store statistics are unavailable.' });
-    try {
-        const result = await pool.query("SELECT COUNT(*)::integer AS count FROM orders WHERE status IN ('shipped', 'delivered')");
-        res.json({ ordersShipped: result.rows[0].count });
-    } catch (error) {
-        console.error('Store stats error:', error.message);
-        res.status(500).json({ error: 'Unable to load store statistics.' });
-    }
-});
-
 // Upload endpoint — serverless-friendly (writes to /tmp on Vercel)
 app.post('/api/admin/upload', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -750,7 +822,7 @@ app.post('/api/admin/upload', upload.single('image'), (req, res) => {
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Provide a lightweight /api/checkout-status to let frontend poll
-app.get('/api/checkout-status', async (req, res) => {
+app.get('/api/checkout-status', requireAdmin, async (req, res) => {
     try {
         const sessionId = req.query.session_id;
         if (!sessionId) return res.json({ status: 'unknown' });
@@ -763,7 +835,7 @@ app.get('/api/checkout-status', async (req, res) => {
 });
 
 // Add a cancel endpoint so frontend can mark a pre-created order as abandoned
-app.post('/api/checkout/cancel', async (req, res) => {
+app.post('/api/checkout/cancel', requireAdmin, async (req, res) => {
     try {
         const { sessionId } = req.body;
         if (!sessionId) return res.status(400).json({ error: 'No sessionId provided' });
@@ -809,8 +881,7 @@ app.get('*', (req, res) => {
 
 // Startup / export handling: when required (e.g. by serverless wrapper) export app; when run directly, init DB and listen
 if (require.main === module) {
-    dbInitialization = initDb();
-    dbInitialization.then(() => {
+    initializeDatabase().then(() => {
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT}`);
         });
@@ -819,8 +890,7 @@ if (require.main === module) {
         process.exit(1);
     });
 } else {
-    // allow serverless platforms to import the express app
-    dbInitialization = initDb();
-    dbInitialization.catch(err => console.error('DB init (import) error:', err && err.message));
+    // allow serverless platforms to import the Express app
+    initializeDatabase().catch(err => console.error('DB init (import) error:', err && err.message));
     module.exports = app;
 }
