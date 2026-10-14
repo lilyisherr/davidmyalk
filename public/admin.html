@@ -2340,10 +2340,22 @@
         }
 
         async function loadProducts() {
-            const res = await fetch('/api/admin/products');
-            allProducts = await res.json();
-            filterProducts();
-            renderLowStock(allProducts);
+            try {
+                const res = await fetch('/api/admin/products');
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `Products request failed (${res.status}).`);
+                }
+                allProducts = await res.json();
+                if (!Array.isArray(allProducts)) throw new Error('The products response was invalid.');
+                filterProducts();
+                renderLowStock(allProducts);
+            } catch (error) {
+                console.error('Unable to load admin products:', error);
+                document.getElementById('products-table').innerHTML =
+                    `<tr><td colspan="6" class="text-muted font-mono text-xs" style="text-align:center;padding:40px;">${escapeAdminText(error.message || 'Products could not be loaded.')}</td></tr>`;
+                document.getElementById('low-stock-list').textContent = 'Product inventory could not be loaded.';
+            }
         }
 
         function renderProducts(products) {
@@ -2663,7 +2675,12 @@
         }
 
         async function editProduct(id) {
-            const res = await fetch(`/api/products/${id}`);
+            const res = await fetch(`/api/admin/products/${id}`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                showToast(data.error || 'Unable to load product details.', 'error');
+                return;
+            }
             const p = await res.json();
             document.getElementById('prod-id').value = p.id;
             document.getElementById('prod-name').value = p.name;

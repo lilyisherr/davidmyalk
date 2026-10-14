@@ -207,6 +207,7 @@ async function initDb() {
     await pool.query(`
         ALTER TABLE products ADD COLUMN IF NOT EXISTS product_images JSONB DEFAULT '[]';
         ALTER TABLE products ADD COLUMN IF NOT EXISTS size_inventory JSONB DEFAULT '{}';
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_carrier VARCHAR(50) DEFAULT '';
     `);
 
@@ -269,6 +270,56 @@ function safeUser(user) {
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         role: user.role
+    };
+}
+
+function normalizeProduct(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+        return { error: 'Provide product details.' };
+
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    const description = typeof input.description === 'string' ? input.description : '';
+    const category = typeof input.category === 'string' ? input.category.trim() : '';
+    const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
+    const price = typeof input.price === 'number'
+        ? input.price
+        : typeof input.price === 'string' && input.price.trim() !== '' ? Number(input.price) : NaN;
+    const salePrice = input.salePrice === null || input.salePrice === '' || input.salePrice === undefined
+        ? null
+        : typeof input.salePrice === 'number'
+            ? input.salePrice
+            : typeof input.salePrice === 'string' && input.salePrice.trim() !== '' ? Number(input.salePrice) : NaN;
+    const sizeInventory = input.sizeInventory;
+    const productImages = input.productImages === undefined ? [] : input.productImages;
+
+    if (!name || name.length > 255) return { error: 'Product name is required and must be at most 255 characters.' };
+    if (!Number.isFinite(price) || price < 0) return { error: 'Enter a valid product price.' };
+    if (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 0))
+        return { error: 'Enter a valid sale price.' };
+    if (description.length > 10000 || category.length > 100 || imageUrl.length > 500)
+        return { error: 'One or more product fields are too long.' };
+    if (typeof input.isActive !== 'boolean') return { error: 'Product visibility must be selected.' };
+    if (!Array.isArray(productImages) || productImages.length > 20
+        || productImages.some(image => typeof image !== 'string' || image.length > 500))
+        return { error: 'Product images must be a list of at most 20 valid image URLs.' };
+    if (sizeInventory !== null && (typeof sizeInventory !== 'object' || Array.isArray(sizeInventory)
+        || Object.values(sizeInventory).some(value => !Number.isInteger(Number(value)) || Number(value) < 0)))
+        return { error: 'Size inventory must contain non-negative whole numbers.' };
+
+    const rawStock = sizeInventory
+        ? Object.values(sizeInventory).reduce((total, value) => total + Number(value), 0)
+        : typeof input.stock === 'number'
+            ? input.stock
+            : typeof input.stock === 'string' && input.stock.trim() !== '' ? Number(input.stock) : NaN;
+    if (!Number.isInteger(rawStock) || rawStock < 0 || rawStock > 2147483647)
+        return { error: 'Stock must be a non-negative whole number.' };
+
+    return {
+        values: [
+            name, description, price, salePrice, imageUrl, category, rawStock,
+            JSON.stringify(productImages), JSON.stringify(sizeInventory || {}),
+            input.isActive
+        ]
     };
 }
 
@@ -459,6 +510,173 @@ app.get('/api/admin/settings', async (req, res) => {
     catch (error) {
         console.error('Admin settings error:', error.message);
         res.status(500).json({ error: 'Unable to load settings.' });
+    }
+});
+
+app.get('/api/admin/categories', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category <> '' ORDER BY category"
+        );
+        res.json(result.rows.map(row => row.category));
+    } catch (error) {
+        console.error('Admin categories error:', error.message);
+        res.status(500).json({ error: 'Unable to load product categories.' });
+    }
+});
+
+app.get('/api/admin/products', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM products ORDER BY created_at DESC, id DESC');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin products error:', error.message);
+        res.status(500).json({ error: 'Unable to load products. Check the database schema and server logs.' });
+    }
+});
+
+app.get('/api/admin/products/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    try {
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin product details error:', error.message);
+        res.status(500).json({ error: 'Unable to load product details.' });
+    }
+});
+
+app.post('/api/admin/products', async (req, res) => {
+    const product = normalizeProduct(req.body);
+    if (product.error) return res.status(400).json({ error: product.error });
+    try {
+        const result = await pool.query(`
+            INSERT INTO products
+                (name, description, price, sale_price, image_url, category, stock, product_images, size_inventory, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10)
+            RETURNING *
+        `, product.values);
+        await adminLog(req, 'product_created', `Created product ${result.rows[0].name} (ID ${result.rows[0].id})`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin product creation error:', error.message);
+        res.status(500).json({ error: 'Unable to create product.' });
+    }
+});
+
+app.put('/api/admin/products/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    const product = normalizeProduct(req.body);
+    if (product.error) return res.status(400).json({ error: product.error });
+    try {
+        const result = await pool.query(`
+            UPDATE products
+            SET name = $1, description = $2, price = $3, sale_price = $4, image_url = $5,
+                category = $6, stock = $7, product_images = $8::jsonb, size_inventory = $9::jsonb,
+                is_active = $10
+            WHERE id = $11
+            RETURNING *
+        `, [...product.values, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_updated', `Updated product ${result.rows[0].name} (ID ${id})`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin product update error:', error.message);
+        res.status(500).json({ error: 'Unable to update product.' });
+    }
+});
+
+app.delete('/api/admin/products/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    try {
+        const result = await pool.query('UPDATE products SET is_active = false WHERE id = $1 RETURNING name', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_deactivated', `Deactivated product ${result.rows[0].name} (ID ${id})`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin product deactivation error:', error.message);
+        res.status(500).json({ error: 'Unable to deactivate product.' });
+    }
+});
+
+app.delete('/api/admin/products/:id/permanent', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    try {
+        const linkedOrder = await pool.query(`
+            SELECT 1
+            FROM orders o
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(o.items) = 'array' THEN o.items ELSE '[]'::jsonb END
+            ) AS item
+            WHERE item->>'id' = $1
+            LIMIT 1
+        `, [String(id)]);
+        if (linkedOrder.rows.length)
+            return res.status(409).json({ error: 'Products included in existing orders cannot be permanently deleted.' });
+        const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING name', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_deleted', `Permanently deleted product ${result.rows[0].name} (ID ${id})`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin product deletion error:', error.message);
+        res.status(500).json({ error: 'Unable to permanently delete product.' });
+    }
+});
+
+app.patch('/api/admin/products/:id/reactivate', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    try {
+        const result = await pool.query('UPDATE products SET is_active = true WHERE id = $1 RETURNING name', [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_reactivated', `Reactivated product ${result.rows[0].name} (ID ${id})`);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Admin product reactivation error:', error.message);
+        res.status(500).json({ error: 'Unable to reactivate product.' });
+    }
+});
+
+app.post('/api/admin/products/:id/duplicate', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    try {
+        const result = await pool.query(`
+            INSERT INTO products
+                (name, description, price, sale_price, image_url, category, stock, product_images, size_inventory, is_active)
+            SELECT name || ' (Copy)', description, price, sale_price, image_url, category,
+                   0, product_images, '{}'::jsonb, false
+            FROM products
+            WHERE id = $1
+            RETURNING *
+        `, [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_duplicated', `Duplicated product ${id} as ID ${result.rows[0].id}`);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin product duplication error:', error.message);
+        res.status(500).json({ error: 'Unable to duplicate product.' });
+    }
+});
+
+app.patch('/api/admin/products/:id/stock', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const stock = Number(req.body && req.body.stock);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID.' });
+    if (!Number.isInteger(stock) || stock < 0) return res.status(400).json({ error: 'Stock must be a non-negative whole number.' });
+    try {
+        const result = await pool.query('UPDATE products SET stock = $1 WHERE id = $2 RETURNING id, stock', [stock, id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+        await adminLog(req, 'product_stock_updated', `Updated stock for product ID ${id} to ${stock}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Admin product stock error:', error.message);
+        res.status(500).json({ error: 'Unable to update product stock.' });
     }
 });
 
@@ -848,12 +1066,15 @@ app.post('/api/checkout/cancel', requireAdmin, async (req, res) => {
 // Basic products endpoint for storefront
 app.get('/api/products', async (req, res) => {
     try {
-        if (!pool) return res.json([]);
+        if (!pool) return res.status(503).json({ error: 'Product catalog is temporarily unavailable.' });
         const r = await pool.query(
             'SELECT id, name, description, price, sale_price, image_url, category, stock, is_active, created_at, product_images, size_inventory FROM products WHERE is_active = true ORDER BY created_at DESC'
         );
         res.json(r.rows);
-    } catch (err) { console.error(err.message); res.status(500).json({ error: 'Server error' }); }
+    } catch (err) {
+        console.error('Public products error:', err.message);
+        res.status(500).json({ error: 'Unable to load products.' });
+    }
 });
 
 // Fallback to serve public HTML pages

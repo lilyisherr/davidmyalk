@@ -749,6 +749,7 @@
     <script src="/js/components.js"></script>
     <script>
         let products = [];
+        let productLoadFailed = false;
         let cart = [];
         let currentUser = null;
         let activeCategory = 'all';
@@ -782,14 +783,28 @@
             loadCart();
 
             // Fetch products and auth independently so a failure in one doesn't kill the other
-            try {
-                const [prodRes, authRes] = await Promise.all([
+            const [prodResult, authResult] = await Promise.allSettled([
                     fetch('/api/products'),
                     fetch('/api/auth/me')
-                ]);
-                try { products = await prodRes.json(); } catch { products = []; }
-                try { const d = await authRes.json(); currentUser = d.user || null; } catch { currentUser = null; }
-            } catch { products = []; currentUser = null; }
+            ]);
+            try {
+                if (prodResult.status === 'rejected') throw prodResult.reason;
+                if (!prodResult.value.ok) throw new Error(`Products request failed (${prodResult.value.status}).`);
+                const productData = await prodResult.value.json();
+                if (!Array.isArray(productData)) throw new Error('The products response was invalid.');
+                products = productData;
+                productLoadFailed = false;
+            } catch (error) {
+                console.error('Unable to load store products:', error);
+                products = [];
+                productLoadFailed = true;
+            }
+            try {
+                if (authResult.status === 'rejected') throw authResult.reason;
+                if (!authResult.value.ok) throw new Error(`Authentication request failed (${authResult.value.status}).`);
+                const authData = await authResult.value.json();
+                currentUser = authData.user || null;
+            } catch { currentUser = null; }
 
             cart = cart.filter(item => products.some(p => p.id === item.id && p.is_active));
             saveCart();
@@ -1087,6 +1102,9 @@
                 grid.style.display = 'none';
                 noProducts.style.display = 'block';
                 countEl.textContent = '';
+                noProducts.querySelector('p').textContent = productLoadFailed
+                    ? 'Products are temporarily unavailable. Please try again shortly.'
+                    : 'No products match your filters.';
                 return;
             }
             grid.style.display = '';
