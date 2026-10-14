@@ -28,6 +28,10 @@ Serves the app on port 5000.
 
 - `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Replit)
 - `SESSION_SECRET` — JWT signing secret
+- `BOOTSTRAP_ADMIN_EMAIL` — exact email address allowed to create the initial owner account
+- `SMTP_USER` / `SMTP_PASS` — dedicated Gmail account and Gmail app password for server email
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` — Gmail SMTP connection (`smtp.gmail.com`, `587`, `false`)
+- `CONTACT_FORM_EMAIL` — private destination for contact form submissions
 - `STRIPE_SECRET_KEY` — Stripe secret key (set in Replit Secrets)
 - `STRIPE_PUBLISHABLE_KEY` — Stripe publishable key (set in Replit Secrets)
 
@@ -35,4 +39,6 @@ Serves the app on port 5000.
 
 - Keep the dark drift-culture aesthetic throughout the UI
 - Admin panel accessible at /admin
-- First registered user gets "owner" role automatically
+- Public signups receive the customer role. Set `BOOTSTRAP_ADMIN_EMAIL` before the designated owner signs up; never grant admin access based on signup order.
+- `/admin` and `/admin.html` are served only to authenticated admins/owners, and `/api/admin/*` endpoints enforce the same role check.
+- See `setup_email.md` for Gmail app-password and deployment-secret setup.

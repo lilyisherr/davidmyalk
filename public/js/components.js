@@ -178,7 +178,7 @@ const SIZE_GUIDE_MODAL_HTML = `
     <div style="padding:24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--navy-light);z-index:2;">
       <div>
         <h2 style="font-family:'Anton',sans-serif;font-size:26px;margin:0;text-transform:uppercase;">SIZE <span style="color:#FF0000;">GUIDE</span></h2>
-        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:10px;margin:4px 0 0;letter-spacing:0.12em;">ALL MEASUREMENTS IN INCHES</p>
+        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:10px;margin:4px 0 0;letter-spacing:0.12em;">GARMENT MEASUREMENTS · INCHES / CM</p>
       </div>
       <button onclick="closeSizeGuideGlobal()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>
     </div>
@@ -188,16 +188,17 @@ const SIZE_GUIDE_MODAL_HTML = `
         <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;">
           <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
             <th style="text-align:left;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SIZE</th>
-            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST WIDTH*</th>
             <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">LENGTH</th>
             <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SHOULDER</th>
           </tr></thead>
           <tbody>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">36–38"</td><td style="padding:10px 12px;text-align:center;">27"</td><td style="padding:10px 12px;text-align:center;">17"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">38–40"</td><td style="padding:10px 12px;text-align:center;">28"</td><td style="padding:10px 12px;text-align:center;">18"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">40–42"</td><td style="padding:10px 12px;text-align:center;">29"</td><td style="padding:10px 12px;text-align:center;">19"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">42–44"</td><td style="padding:10px 12px;text-align:center;">30"</td><td style="padding:10px 12px;text-align:center;">20"</td></tr>
-            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">44–46"</td><td style="padding:10px 12px;text-align:center;">31"</td><td style="padding:10px 12px;text-align:center;">21"</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">XS</td><td style="padding:10px 12px;text-align:center;">17" / 43 cm</td><td style="padding:10px 12px;text-align:center;">26" / 66 cm</td><td style="padding:10px 12px;text-align:center;">16" / 41 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">18" / 46 cm</td><td style="padding:10px 12px;text-align:center;">27" / 69 cm</td><td style="padding:10px 12px;text-align:center;">17" / 43 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">20" / 51 cm</td><td style="padding:10px 12px;text-align:center;">28" / 71 cm</td><td style="padding:10px 12px;text-align:center;">18" / 46 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">22" / 56 cm</td><td style="padding:10px 12px;text-align:center;">29" / 74 cm</td><td style="padding:10px 12px;text-align:center;">20" / 51 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">24" / 61 cm</td><td style="padding:10px 12px;text-align:center;">30" / 76 cm</td><td style="padding:10px 12px;text-align:center;">21" / 53 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">26" / 66 cm</td><td style="padding:10px 12px;text-align:center;">31" / 79 cm</td><td style="padding:10px 12px;text-align:center;">23" / 58 cm</td></tr>
           </tbody>
         </table></div>
       </div>
@@ -206,23 +207,25 @@ const SIZE_GUIDE_MODAL_HTML = `
         <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;">
           <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
             <th style="text-align:left;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SIZE</th>
-            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST</th>
+            <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">CHEST WIDTH*</th>
             <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">LENGTH</th>
             <th style="text-align:center;padding:10px 12px;color:rgba(255,255,255,0.5);font-weight:400;">SLEEVE</th>
           </tr></thead>
           <tbody>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">38–40"</td><td style="padding:10px 12px;text-align:center;">26"</td><td style="padding:10px 12px;text-align:center;">33"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">40–42"</td><td style="padding:10px 12px;text-align:center;">27"</td><td style="padding:10px 12px;text-align:center;">34"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">42–44"</td><td style="padding:10px 12px;text-align:center;">28"</td><td style="padding:10px 12px;text-align:center;">35"</td></tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">44–46"</td><td style="padding:10px 12px;text-align:center;">29"</td><td style="padding:10px 12px;text-align:center;">36"</td></tr>
-            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">46–48"</td><td style="padding:10px 12px;text-align:center;">30"</td><td style="padding:10px 12px;text-align:center;">37"</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">XS</td><td style="padding:10px 12px;text-align:center;">18" / 46 cm</td><td style="padding:10px 12px;text-align:center;">25" / 64 cm</td><td style="padding:10px 12px;text-align:center;">32" / 81 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">S</td><td style="padding:10px 12px;text-align:center;">19" / 48 cm</td><td style="padding:10px 12px;text-align:center;">26" / 66 cm</td><td style="padding:10px 12px;text-align:center;">33" / 84 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">M</td><td style="padding:10px 12px;text-align:center;">21" / 53 cm</td><td style="padding:10px 12px;text-align:center;">27" / 69 cm</td><td style="padding:10px 12px;text-align:center;">34" / 86 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">L</td><td style="padding:10px 12px;text-align:center;">23" / 58 cm</td><td style="padding:10px 12px;text-align:center;">28" / 71 cm</td><td style="padding:10px 12px;text-align:center;">35" / 89 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">XL</td><td style="padding:10px 12px;text-align:center;">25" / 64 cm</td><td style="padding:10px 12px;text-align:center;">29" / 74 cm</td><td style="padding:10px 12px;text-align:center;">36" / 91 cm</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:700;">2XL</td><td style="padding:10px 12px;text-align:center;">27" / 69 cm</td><td style="padding:10px 12px;text-align:center;">30" / 76 cm</td><td style="padding:10px 12px;text-align:center;">37" / 94 cm</td></tr>
           </tbody>
         </table></div>
       </div>
       <div style="padding:16px;background:rgba(255,0,0,0.05);border:1px solid rgba(255,0,0,0.15);">
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;color:#FF0000;margin-bottom:8px;">FIT NOTE</div>
-        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:11px;line-height:1.7;margin:0;">Our apparel is designed with a <strong style="color:#fff;">relaxed / streetwear fit</strong>. If you’re between sizes or prefer a more fitted look, size down. If you want that oversized culture look, stay true to size or size up.</p>
+        <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:11px;line-height:1.7;margin:0;">These are general reference measurements, not manufacturer-verified specs. Garment fit can vary by product and supplier; check a product-specific chart when available and compare with a similar garment you own.</p>
       </div>
+      <p style="font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);font-size:10px;line-height:1.7;margin:20px 0 0;">*Chest width is measured flat, straight across from armpit seam to armpit seam; it is not body circumference. Body length is measured from the high shoulder point to the hem. Hoodie sleeve is measured from center back neck to cuff.</p>
     </div>
   </div>
 </div>`;

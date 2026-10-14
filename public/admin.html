@@ -28,6 +28,7 @@
         .settings-nav-label { display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; color: rgba(255,50,50,0.7); padding: 10px 14px 4px; text-transform: uppercase; }
         .settings-nav-btn { display: block; width: 100%; text-align: left; padding: 8px 14px; border: none; background: none; color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s; border-left: 2px solid transparent; }
         .settings-nav-btn:hover { color: white; background: rgba(255,255,255,0.03); }
+        .settings-nav-btn[hidden], .settings-panel[hidden] { display: none !important; }
         .settings-nav-btn.active { color: var(--primary); border-left-color: var(--primary); background: rgba(255,0,0,0.06); }
         @media (max-width: 960px) { .settings-layout { grid-template-columns: 1fr; } .settings-nav { position: static; display: grid; grid-template-columns: repeat(2, 1fr); border-bottom: none; } .settings-nav-group { border-bottom: 1px solid var(--border); } }
         @media (max-width: 480px) { .settings-nav { grid-template-columns: 1fr; } }
@@ -604,17 +605,17 @@
                 <div class="admin-header">
                     <div>
                         <h2 class="admin-title">STORE <span class="text-red">SETTINGS</span></h2>
-                        <p class="admin-subtitle">Configure your store, branding, and content</p>
+                        <p class="admin-subtitle">Manage orders, operations, email, and store policies</p>
                     </div>
                 </div>
                 <div class="settings-layout">
                     <div class="settings-nav">
                         <div class="settings-nav-group">
-                            <span class="settings-nav-label">Store</span>
+                            <span class="settings-nav-label">Store operations</span>
                             <button class="settings-nav-btn active" data-tab="general" onclick="showSettingsTab('general')">General</button>
-                            <button class="settings-nav-btn" data-tab="socials" onclick="showSettingsTab('socials')">Social Links</button>
-                            <button class="settings-nav-btn" data-tab="branding" onclick="showSettingsTab('branding')">Hero &amp; Banner</button>
-                            <button class="settings-nav-btn" data-tab="content" onclick="showSettingsTab('content')">Content</button>
+                            <button class="settings-nav-btn" data-tab="socials" onclick="showSettingsTab('socials')" hidden>Social Links</button>
+                            <button class="settings-nav-btn" data-tab="branding" onclick="showSettingsTab('branding')" hidden>Hero &amp; Banner</button>
+                            <button class="settings-nav-btn" data-tab="content" onclick="showSettingsTab('content')" hidden>Content</button>
                         </div>
                         <div class="settings-nav-group">
                             <span class="settings-nav-label">Commerce</span>
@@ -625,18 +626,18 @@
                             <button class="settings-nav-btn" data-tab="inventory" onclick="showSettingsTab('inventory')">Inventory</button>
                         </div>
                         <div class="settings-nav-group">
-                            <span class="settings-nav-label">Marketing</span>
-                            <button class="settings-nav-btn" data-tab="seo" onclick="showSettingsTab('seo')">SEO</button>
-                            <button class="settings-nav-btn" data-tab="analytics" onclick="showSettingsTab('analytics')">Analytics</button>
+                            <span class="settings-nav-label">Customer service</span>
+                            <button class="settings-nav-btn" data-tab="seo" onclick="showSettingsTab('seo')" hidden>SEO</button>
+                            <button class="settings-nav-btn" data-tab="analytics" onclick="showSettingsTab('analytics')" hidden>Analytics</button>
                             <button class="settings-nav-btn" data-tab="notifications" onclick="showSettingsTab('notifications')">Notifications</button>
-                            <button class="settings-nav-btn" data-tab="storefront" onclick="showSettingsTab('storefront')">Storefront Sections</button>
+                            <button class="settings-nav-btn" data-tab="storefront" onclick="showSettingsTab('storefront')" hidden>Storefront Sections</button>
                         </div>
-                        <div class="settings-nav-group">
+                        <div class="settings-nav-group" hidden>
                             <span class="settings-nav-label">Advanced</span>
-                            <button class="settings-nav-btn" data-tab="policies" onclick="showSettingsTab('policies')">Policies</button>
-                            <button class="settings-nav-btn" data-tab="customcode" onclick="showSettingsTab('customcode')">Custom Code</button>
-                            <button class="settings-nav-btn" data-tab="webhooks" onclick="showSettingsTab('webhooks')">Webhooks</button>
-                            <button class="settings-nav-btn" data-tab="advanced" onclick="showSettingsTab('advanced')">Advanced</button>
+                            <button class="settings-nav-btn" data-tab="policies" onclick="showSettingsTab('policies')" hidden>Policies</button>
+                            <button class="settings-nav-btn" data-tab="customcode" onclick="showSettingsTab('customcode')" hidden>Custom Code</button>
+                            <button class="settings-nav-btn" data-tab="webhooks" onclick="showSettingsTab('webhooks')" hidden>Webhooks</button>
+                            <button class="settings-nav-btn" data-tab="advanced" onclick="showSettingsTab('advanced')" hidden>Advanced</button>
                         </div>
                     </div>
                     <div class="settings-content">
@@ -644,54 +645,17 @@
                 <!-- GENERAL TAB -->
                 <div class="settings-panel" id="stab-general">
                     <div class="card" style="max-width:700px;">
-                        <h3 class="settings-card-title">YOUR <span class="text-red">STORE</span></h3>
-                        <p class="settings-card-desc">The basics — your store's name and how it shows up on the site.</p>
-                        <div class="mb-4">
-                            <label class="input-label">STORE NAME</label>
-                            <input type="text" class="input-field" id="set-store_name" value="DAVID MYALIK">
-                            <span class="font-mono text-xs text-muted">Your brand name — shows in the header and around the site</span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">TAGLINE</label>
-                            <input type="text" class="input-field" id="set-store_tagline" value="Sideways Always">
-                            <span class="font-mono text-xs text-muted">A short phrase that describes your brand</span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">ABOUT YOUR STORE</label>
-                            <textarea class="input-field" id="set-store_description" style="min-height:80px;">Drift culture apparel for those who live life sideways.</textarea>
-                            <span class="font-mono text-xs text-muted">A longer description of what your store is about</span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">FOOTER TEXT</label>
-                            <input type="text" class="input-field" id="set-footer_tagline" value="Drift culture apparel for those who live life sideways. Born from the smoke, built for the streets.">
-                            <span class="font-mono text-xs text-muted">The text that shows at the very bottom of every page, under your logo</span>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['store_name','store_tagline','store_description','footer_tagline'])">SAVE</button>
+                        <h3 class="settings-card-title">STORE <span class="text-red">OPERATIONS</span></h3>
+                        <p class="settings-card-desc">Set up customer contact and configure how orders are handled. Brand and page content stay in the site code.</p>
                     </div>
                     <div class="card" style="max-width:700px;margin-top:24px;">
-                        <h3 class="settings-card-title">CONTACT <span class="text-red">INFO</span></h3>
-                        <p class="settings-card-desc">How customers can reach you. This shows up on the site and in emails.</p>
+                        <h3 class="settings-card-title">PUBLIC <span class="text-red">CONTACT EMAIL</span></h3>
+                        <p class="settings-card-desc">This address is shown on the contact page. Private notification addresses and mail credentials are never part of public settings.</p>
                         <div class="mb-4">
                             <label class="input-label">EMAIL ADDRESS</label>
                             <input type="email" class="input-field" id="set-contact_email" value="contact@davidmyalik.com">
-                            <span class="font-mono text-xs text-muted">Where customers can email you</span>
                         </div>
-                        <div class="mb-4">
-                            <label class="input-label">PHONE NUMBER</label>
-                            <input type="text" class="input-field" id="set-contact_phone" value="+1 (555) 123-4567">
-                            <span class="font-mono text-xs text-muted">Your business phone number (optional)</span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">ADDRESS</label>
-                            <textarea class="input-field" id="set-contact_address" style="min-height:60px;">123 Drift Lane, Smoke City, CA 90210</textarea>
-                            <span class="font-mono text-xs text-muted">Your business or mailing address (optional)</span>
-                        </div>
-                        <div class="mb-4">
-                            <label class="input-label">BUSINESS HOURS</label>
-                            <input type="text" class="input-field" id="set-business_hours" value="Mon-Fri 9AM-5PM PST">
-                            <span class="font-mono text-xs text-muted">When you're available — for example "Mon-Fri 9AM-5PM"</span>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['contact_email','contact_phone','contact_address','business_hours'])">SAVE</button>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['contact_email'])">SAVE CONTACT EMAIL</button>
                     </div>
                 </div>
 
@@ -755,33 +719,12 @@
                                 <span class="font-mono text-xs text-muted">The smallest order you'll accept. 0 means no minimum.</span>
                             </div>
                         </div>
-                        <div class="mb-4">
-                            <label class="input-label">CURRENCY</label>
-                            <select class="input-field" id="set-currency" style="max-width:200px;">
-                                <option value="USD">USD ($)</option>
-                                <option value="EUR">EUR (€)</option>
-                                <option value="GBP">GBP (£)</option>
-                                <option value="CAD">CAD (C$)</option>
-                                <option value="AUD">AUD (A$)</option>
-                            </select>
-                            <span class="font-mono text-xs text-muted">What currency your prices are shown in</span>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_prefix','min_order_amount','currency'])">SAVE</button>
+                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_prefix','min_order_amount'])">SAVE</button>
                     </div>
                 </div>
 
                 <!-- ORDERS TAB -->
                 <div class="settings-panel" id="stab-orders" style="display:none;">
-                    <div class="card" style="max-width:700px;">
-                        <h3 class="settings-card-title">ORDER <span class="text-red">CONFIRMATION</span></h3>
-                        <p class="settings-card-desc">The message customers see after they successfully place an order.</p>
-                        <div class="mb-4">
-                            <label class="input-label">CONFIRMATION MESSAGE</label>
-                            <textarea class="input-field" id="set-order_confirmation_message" style="min-height:80px;">Thank you for your order! We'll start processing it right away.</textarea>
-                            <span class="font-mono text-xs text-muted">Shown on the order success screen after checkout</span>
-                        </div>
-                        <button class="btn btn-primary" onclick="saveBulkSettings(['order_confirmation_message'])">SAVE</button>
-                    </div>
                     <div class="card" style="max-width:700px;margin-top:24px;">
                         <h3 class="settings-card-title">PROCESSING <span class="text-red">TIMES</span></h3>
                         <p class="settings-card-desc">How long it takes to pack and ship orders. These show up on product and policy pages.</p>
@@ -885,14 +828,15 @@
                     <!-- SMTP Settings -->
                     <div class="card" style="max-width:700px;margin-top:24px;">
                         <h3 class="settings-card-title">EMAIL / <span class="text-red">SMTP</span></h3>
-                        <p class="settings-card-desc">Connect your email provider to send order confirmations, shipping updates, and contact form emails automatically. Works with Gmail, SendGrid, Mailgun, Postmark, etc.</p>
+                        <p class="settings-card-desc">Use a Gmail app password stored as a deployment secret. Never put your normal Google password or SMTP password in this dashboard. See setup_email.md for setup steps.</p>
                         <div class="grid-2 mb-4">
                             <div><label class="input-label">SMTP HOST</label><input type="text" class="input-field" id="set-smtp_host" placeholder="smtp.gmail.com"></div>
                             <div><label class="input-label">SMTP PORT</label><input type="number" class="input-field" id="set-smtp_port" placeholder="587"></div>
                         </div>
-                        <div class="grid-2 mb-4">
-                            <div><label class="input-label">USERNAME / EMAIL</label><input type="text" class="input-field" id="set-smtp_user" placeholder="you@example.com"></div>
-                            <div><label class="input-label">PASSWORD / API KEY</label><input type="password" class="input-field" id="set-smtp_pass" placeholder="••••••••••••••"></div>
+                        <div class="mb-4">
+                            <label class="input-label">GMAIL ACCOUNT</label>
+                            <input type="email" class="input-field" id="set-smtp_user" placeholder="store-mail@gmail.com">
+                            <span class="font-mono text-xs text-muted">Store the same address in the SMTP_USER deployment secret.</span>
                         </div>
                         <div class="grid-2 mb-4">
                             <div><label class="input-label">FROM NAME</label><input type="text" class="input-field" id="set-smtp_from_name" placeholder="David Myalik Store"></div>
@@ -919,7 +863,7 @@
                     <!-- Email Templates -->
                     <div class="card" style="max-width:700px;margin-top:24px;">
                         <h3 class="settings-card-title">EMAIL <span class="text-red">TEMPLATES</span></h3>
-                        <p class="settings-card-desc">Customize emails sent to customers. Use variables: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{customer_name}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{order_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{total}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_url}}</code></p>
+                        <p class="settings-card-desc">Contact form auto-replies are active. Order confirmation and shipping templates can be saved here, but need checkout/order notification hooks before they send. Available variables: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{customer_name}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{order_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{total}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_number}}</code> <code style="background:rgba(255,255,255,0.05);padding:2px 6px;">{{tracking_url}}</code></p>
 
                         <!-- Order Confirmation -->
                         <div style="border:1px solid var(--border);padding:16px;margin-bottom:16px;">
@@ -962,7 +906,7 @@
                 </div>
 
                 <!-- HERO TAB -->
-                <div class="settings-panel" id="stab-branding" style="display:none;">
+                <div class="settings-panel" id="stab-branding" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">HOMEPAGE <span class="text-red">HERO</span></h3>
                         <p class="settings-card-desc">This is the big banner at the top of your homepage — the first thing visitors see.</p>
@@ -986,7 +930,7 @@
                 </div>
 
                 <!-- CONTENT TAB -->
-                <div class="settings-panel" id="stab-content" style="display:none;">
+                <div class="settings-panel" id="stab-content" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">THE GRIND <span class="text-red">SECTION</span></h3>
                         <p class="settings-card-desc">This is the "about" section on your homepage — it tells visitors what your brand is about. Tip: Put a | before a word in the title to make it red, like "THE |GRIND".</p>
@@ -1029,7 +973,7 @@
                 </div>
 
                 <!-- SOCIAL LINKS TAB -->
-                <div class="settings-panel" id="stab-socials" style="display:none;">
+                <div class="settings-panel" id="stab-socials" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">SOCIAL <span class="text-red">MEDIA</span></h3>
                         <p class="settings-card-desc">Add your social media links here. Turn them on and paste the URL — they'll show up as icons in the footer of your site. If a link is turned off or empty, it won't show.</p>
@@ -1109,7 +1053,7 @@
                 </div>
 
                 <!-- SEO TAB -->
-                <div class="settings-panel" id="stab-seo" style="display:none;">
+                <div class="settings-panel" id="stab-seo" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">SEARCH ENGINE <span class="text-red">SETTINGS</span></h3>
                         <p class="settings-card-desc">Control how your store appears in Google and when shared on social media. These settings don't change what visitors see on your site — only what search engines and social platforms show.</p>
@@ -1140,7 +1084,7 @@
                 </div>
 
                 <!-- ANALYTICS TAB -->
-                <div class="settings-panel" id="stab-analytics" style="display:none;">
+                <div class="settings-panel" id="stab-analytics" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">GOOGLE <span class="text-red">ANALYTICS</span></h3>
                         <p class="settings-card-desc">Track traffic, conversions, and customer behavior with Google Analytics 4.</p>
@@ -1174,7 +1118,7 @@
                 </div>
 
                 <!-- STOREFRONT SECTIONS TAB -->
-                <div class="settings-panel" id="stab-storefront" style="display:none;">
+                <div class="settings-panel" id="stab-storefront" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">FEATURED <span class="text-red">COLLECTION</span></h3>
                         <p class="settings-card-desc">The highlighted products section on your homepage.</p>
@@ -1208,7 +1152,7 @@
                 </div>
 
                 <!-- CUSTOM CODE TAB -->
-                <div class="settings-panel" id="stab-customcode" style="display:none;">
+                <div class="settings-panel" id="stab-customcode" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">CUSTOM <span class="text-red">HEADER CODE</span></h3>
                         <p class="settings-card-desc">HTML/JS injected inside the <code>&lt;head&gt;</code> on every page. Use for third-party scripts, custom fonts, or meta tags not covered above.</p>
@@ -1228,7 +1172,7 @@
                 </div>
 
                 <!-- WEBHOOKS TAB -->
-                <div class="settings-panel" id="stab-webhooks" style="display:none;">
+                <div class="settings-panel" id="stab-webhooks" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">ORDER <span class="text-red">WEBHOOK</span></h3>
                         <p class="settings-card-desc">Send an HTTP POST request to your endpoint every time a new order is placed. Useful for connecting Zapier, Make, or custom automations.</p>
@@ -1251,7 +1195,7 @@
                 </div>
 
                 <!-- POLICIES TAB -->
-                <div class="settings-panel" id="stab-policies" style="display:none;">
+                <div class="settings-panel" id="stab-policies" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">RETURN <span class="text-red">POLICY</span></h3>
                         <p class="settings-card-desc">Tell customers exactly how returns and exchanges work. This text appears on your Returns page and in the help center.</p>
@@ -1279,7 +1223,7 @@
                 </div>
 
                 <!-- ADVANCED TAB -->
-                <div class="settings-panel" id="stab-advanced" style="display:none;">
+                <div class="settings-panel" id="stab-advanced" style="display:none;" hidden>
                     <div class="card" style="max-width:700px;">
                         <h3 class="settings-card-title">MAINTENANCE <span class="text-red">MODE</span></h3>
                         <p class="settings-card-desc">Need to work on your store? Turn this on and customers will see a "We'll be back soon" page instead of the store. You (the admin) can still use the site normally.</p>
@@ -1783,29 +1727,19 @@
 
         async function loadSettings() {
             try {
-                const [allRes, shipRes, grindRes, socialsRes] = await Promise.all([
-                    fetch('/api/settings/all'),
-                    fetch('/api/settings/shipping'),
-                    fetch('/api/settings/grind'),
-                    fetch('/api/settings/socials')
+                const [allRes, shipRes] = await Promise.all([
+                    fetch('/api/admin/settings'),
+                    fetch('/api/settings/shipping')
                 ]);
+                if (!allRes.ok || !shipRes.ok) throw new Error('Settings request failed');
                 allSiteSettings = await allRes.json();
                 const shipData = await shipRes.json();
                 document.getElementById('settings-shipping-cost').value = shipData.shippingCost.toFixed(2);
-                const grindData = await grindRes.json();
-                document.getElementById('grind-edit-title').value = grindData.title;
-                document.getElementById('grind-edit-text').value = grindData.text;
-                document.getElementById('grind-edit-quote').value = grindData.quote;
-                document.getElementById('grind-edit-image').value = grindData.image;
-                document.getElementById('grind-edit-link-url').value = grindData.linkUrl;
-                document.getElementById('grind-edit-link-text').value = grindData.linkText;
-                if (grindData.image) {
-                    document.getElementById('grind-image-preview').innerHTML = '<img src="' + grindData.image + '" style="max-width:200px;max-height:120px;border-radius:8px;border:1px solid var(--border);" onerror="this.style.display=\'none\'">';
-                }
-                currentSocials = await socialsRes.json();
-                renderSocialsEditor();
                 populateBulkSettings();
-            } catch(e) {}
+            } catch (error) {
+                console.error('Unable to load admin settings:', error);
+                showToast('Unable to load settings. Refresh and sign in again.', 'error');
+            }
         }
 
         async function saveSeoSettings() {
@@ -1888,11 +1822,6 @@
                 const el = document.getElementById('set-' + k);
                 if (el) settings[k] = el.checked ? 'true' : 'false';
             });
-            // Handle password separately — only save if user typed something
-            const passEl = document.getElementById('set-smtp_pass');
-            if (passEl && passEl.value && passEl.value !== '••••••••••••••') {
-                settings['smtp_pass'] = passEl.value;
-            }
             try {
                 const res = await fetch('/api/admin/settings/bulk', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ settings }) });
                 if (res.ok) { showToast('SMTP settings saved!', 'success'); Object.assign(allSiteSettings, settings); }
@@ -1974,7 +1903,7 @@
             document.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
             document.querySelectorAll('.settings-nav-btn').forEach(t => t.classList.remove('active'));
             const panel = document.getElementById('stab-' + tab);
-            if (panel) panel.style.display = 'block';
+            if (panel && !panel.hidden) panel.style.display = 'block';
             const tabBtn = document.querySelector(`.settings-nav-btn[data-tab="${tab}"]`);
             if (tabBtn) tabBtn.classList.add('active');
         }
@@ -2247,10 +2176,10 @@
             const val = parseFloat(document.getElementById('settings-shipping-cost').value);
             if (isNaN(val) || val < 0) { showToast('Invalid shipping cost', 'error'); return; }
             try {
-                const res = await fetch('/api/admin/settings/shipping', {
+                const res = await fetch('/api/admin/settings/bulk', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ shippingCost: val })
+                    body: JSON.stringify({ settings: { shipping_cost: String(val) } })
                 });
                 if (res.ok) {
                     showToast('Shipping cost updated');

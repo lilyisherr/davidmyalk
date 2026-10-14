@@ -1,11 +1,11 @@
 :root {
-  --primary: #FF0000;
-  --primary-dark: #cc0000;
-  --navy: #050810;
-  --navy-light: #0f1623;
-  --navy-card: #0a0f1a;
-  --border: rgba(255,255,255,0.08);
-  --text-muted: rgba(255,255,255,0.5);
+  --primary: #f04438;
+  --primary-dark: #c8322a;
+  --navy: #080b12;
+  --navy-light: #111722;
+  --navy-card: #0d131e;
+  --border: rgba(255,255,255,0.1);
+  --text-muted: rgba(226,232,240,0.62);
   --font-display: 'Anton', sans-serif;
   --font-body: 'Oswald', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -15,7 +15,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background-color: var(--navy);
+  background: radial-gradient(ellipse at 50% -22%, rgba(240,68,56,0.12), transparent 48%), var(--navy);
   color: #fff;
   font-family: var(--font-body);
   overflow-x: hidden;
@@ -132,8 +132,9 @@ textarea.input-field { resize: vertical; min-height: 100px; font-family: var(--f
   padding: 20px; padding-top: 80px;
 }
 .auth-card {
-  background: var(--navy-light); border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(20,28,42,0.98), rgba(12,17,27,0.98)); border: 1px solid var(--border);
   width: 100%; max-width: 440px; padding: 48px; position: relative; overflow: hidden;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.35);
 }
 .auth-card::before {
   content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
@@ -269,6 +270,60 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   60% { transform: translateY(-4px); }
 }
 @keyframes pulse { 0% { opacity: 0.7; } 100% { opacity: 1; } }
+
+::selection { color: #fff; background: rgba(240,68,56,0.72); }
+:focus-visible { outline: 2px solid #ff776e; outline-offset: 3px; }
+
+.nav-auth {
+  background: rgba(8,11,18,0.82);
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+
+.card, .stat-card, .section-card, .settings-nav {
+  border-radius: 8px;
+}
+
+.card, .stat-card, .section-card {
+  box-shadow: 0 12px 36px rgba(0,0,0,0.12);
+}
+
+.btn-primary {
+  background: linear-gradient(115deg, #f04438, #d82d32);
+  box-shadow: 0 8px 24px rgba(216,45,50,0.16);
+}
+
+.btn-primary:hover {
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(255,255,255,0.12);
+}
+
+.input-field {
+  border-radius: 5px;
+}
+
+.input-field:focus {
+  box-shadow: 0 0 0 3px rgba(240,68,56,0.14);
+}
+
+.product-card {
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.product-img-wrap {
+  border-radius: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--navy); }
