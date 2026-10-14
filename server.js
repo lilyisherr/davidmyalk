@@ -17,6 +17,7 @@ const PUBLIC_SETTING_KEYS = [
     'contact_email', 'free_shipping_threshold', 'low_stock_threshold',
     'hero_title', 'hero_subtitle', 'hero_cta_text',
     'newsletter_enabled', 'newsletter_title', 'newsletter_subtitle',
+    'policy_returns', 'policy_shipping', 'policy_privacy', 'policy_terms',
     'banner_enabled', 'banner_text', 'banner_link', 'banner_color'
 ];
 const ADMIN_SETTING_KEYS = [
@@ -30,8 +31,10 @@ const ADMIN_SETTING_KEYS = [
     'smtp_from_email', 'contact_form_email',
     'email_order_confirmation_enabled', 'email_order_confirmation_subject', 'email_order_confirmation_body',
     'email_order_shipped_enabled', 'email_order_shipped_subject', 'email_order_shipped_body',
-    'email_contact_auto_reply_enabled', 'email_contact_auto_reply_subject', 'email_contact_auto_reply_body'
+    'email_contact_auto_reply_enabled', 'email_contact_auto_reply_subject', 'email_contact_auto_reply_body',
+    'policy_returns', 'policy_shipping', 'policy_privacy', 'policy_terms'
 ];
+let dbInitialization = null;
 
 // Support Vercel/Neon environment variable names alongside standard DATABASE_URL
 const dbUrl = process.env.DATABASE_URL
@@ -209,6 +212,15 @@ async function initDb() {
     // Basic migrations left out for brevity in this serverless-friendly copy
 }
 
+function ensureDatabaseInitialized(req, res, next) {
+    if (!pool) return next();
+    if (!dbInitialization) dbInitialization = initDb();
+    dbInitialization.then(next).catch(error => {
+        console.error('Database initialization error:', error.message);
+        res.status(503).json({ error: 'Database services are temporarily unavailable.' });
+    });
+}
+
 // ─── AUTH MIDDLEWARE ───────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
     const token = req.cookies.auth_token;
@@ -237,6 +249,7 @@ async function requireAdmin(req, res, next) {
     }
 }
 app.use(authMiddleware);
+app.use('/api', ensureDatabaseInitialized);
 app.use('/api/admin', requireAdmin);
 
 function safeUser(user) {
@@ -439,6 +452,97 @@ app.get('/api/admin/settings', async (req, res) => {
     }
 });
 
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.created_at,
+                   COUNT(o.id)::integer AS order_count
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.id
+            GROUP BY u.id
+            ORDER BY u.created_at DESC, u.id DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin users error:', error.message);
+        res.status(500).json({ error: 'Unable to load users.' });
+    }
+});
+
+app.get('/api/admin/users/:id', async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid user ID.' });
+    try {
+        const [userResult, addressResult, orderResult] = await Promise.all([
+            pool.query(
+                'SELECT id, email, first_name, last_name, phone, role, created_at FROM users WHERE id = $1',
+                [id]
+            ),
+            pool.query(
+                'SELECT first_name, last_name, address_line1, address_line2, city, state, zip, country FROM user_addresses WHERE user_id = $1 ORDER BY is_default DESC, id DESC',
+                [id]
+            ),
+            pool.query(
+                'SELECT id, order_number, status, total, created_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+                [id]
+            )
+        ]);
+        if (!userResult.rows.length) return res.status(404).json({ error: 'User not found.' });
+        res.json({ user: userResult.rows[0], addresses: addressResult.rows, orders: orderResult.rows });
+    } catch (error) {
+        console.error('Admin user detail error:', error.message);
+        res.status(500).json({ error: 'Unable to load user details.' });
+    }
+});
+
+app.get('/api/admin/logs', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, user_name, action, details, created_at FROM admin_logs ORDER BY created_at DESC, id DESC LIMIT 200'
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Admin activity log error:', error.message);
+        res.status(500).json({ error: 'Unable to load activity.' });
+    }
+});
+
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        const settings = await readSettings(['low_stock_threshold']);
+        const lowStockThreshold = Number.parseInt(settings.low_stock_threshold, 10) || 5;
+        const result = await pool.query(`
+            SELECT
+                (SELECT COUNT(*)::integer FROM orders) AS total_orders,
+                (SELECT COUNT(*)::integer FROM users) AS total_users,
+                (SELECT COUNT(*)::integer FROM products) AS total_products,
+                (SELECT COUNT(*)::integer FROM orders WHERE status = 'pending') AS pending_orders,
+                (SELECT COUNT(*)::integer FROM users WHERE created_at >= date_trunc('month', NOW())) AS new_users_this_month,
+                (SELECT COALESCE(SUM(total), 0)::numeric FROM orders
+                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')) AS total_revenue,
+                (SELECT COALESCE(SUM(total), 0)::numeric FROM orders
+                    WHERE status NOT IN ('pending', 'pending_payment', 'abandoned', 'cancelled')
+                    AND created_at >= date_trunc('month', NOW())) AS monthly_revenue,
+                (SELECT COUNT(*)::integer FROM products
+                    WHERE is_active = true AND stock > 0 AND stock <= $1) AS low_stock_count
+        `, [lowStockThreshold]);
+        const row = result.rows[0];
+        res.json({
+            totalOrders: row.total_orders,
+            totalUsers: row.total_users,
+            totalProducts: row.total_products,
+            pendingOrders: row.pending_orders,
+            newUsersThisMonth: row.new_users_this_month,
+            totalRevenue: Number(row.total_revenue),
+            monthlyRevenue: Number(row.monthly_revenue),
+            lowStockCount: row.low_stock_count
+        });
+    } catch (error) {
+        console.error('Admin statistics error:', error.message);
+        res.status(500).json({ error: 'Unable to load dashboard statistics.' });
+    }
+});
+
 app.put('/api/admin/settings/bulk', async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'Settings storage is unavailable.' });
     const settings = req.body && req.body.settings;
@@ -585,6 +689,8 @@ async function serveAdminPage(req, res, next) {
         return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
     if (!pool) return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
     try {
+        if (!dbInitialization) dbInitialization = initDb();
+        await dbInitialization;
         const result = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
         if (!result.rows.length || !ADMIN_ROLES.has(result.rows[0].role))
             return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
@@ -690,6 +796,8 @@ const htmlRoutes = {
     '/forgot-password': 'forgot-password.html',
     '/contact': 'contact.html',
     '/tracking': 'tracking.html',
+    '/terms': 'legal.html',
+    '/privacy-policy': 'legal.html',
     '/404': '404.html',
     '/500': '500.html',
 };
@@ -701,7 +809,8 @@ app.get('*', (req, res) => {
 
 // Startup / export handling: when required (e.g. by serverless wrapper) export app; when run directly, init DB and listen
 if (require.main === module) {
-    initDb().then(() => {
+    dbInitialization = initDb();
+    dbInitialization.then(() => {
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT}`);
         });
@@ -711,6 +820,7 @@ if (require.main === module) {
     });
 } else {
     // allow serverless platforms to import the express app
-    initDb().catch(err => console.error('DB init (import) error:', err && err.message));
+    dbInitialization = initDb();
+    dbInitialization.catch(err => console.error('DB init (import) error:', err && err.message));
     module.exports = app;
 }
